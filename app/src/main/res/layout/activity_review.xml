@@ -1,0 +1,228 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  activity_review.xml
+  Stage 4: Review & Edit screen
+
+  Layout (top → bottom):
+    1. Toolbar (title only)
+    2. Flagged cells warning banner
+    3. Table header row (sticky)
+    4. RecyclerView (scrollable data rows)
+    5. Bottom bar: Rescan | + Add Member | Export CSV
+-->
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@color/bg_dark">
+
+    <!-- ══ 1. TOOLBAR (title only — actions moved to bottom) ═════════════════ -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="52dp"
+        android:background="@color/card_dark"
+        android:orientation="horizontal"
+        android:gravity="center"
+        android:elevation="4dp">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Review Attendance"
+            android:textColor="@color/text_primary"
+            android:textSize="17sp"
+            android:textStyle="bold"
+            android:gravity="center" />
+
+    </LinearLayout>
+
+    <!-- ══ 2. FLAGGED BANNER ══════════════════════════════════════════════════ -->
+    <LinearLayout
+        android:id="@+id/bannerFlagged"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="#FFFF8F00"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingStart="16dp"
+        android:paddingEnd="16dp"
+        android:paddingTop="8dp"
+        android:paddingBottom="8dp"
+        android:visibility="gone">
+
+        <TextView
+            android:id="@+id/tvBannerText"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="⚠ 3 cells need review (shown in yellow)"
+            android:textColor="#FF1A1A1A"
+            android:textSize="12sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Tap each to fix"
+            android:textColor="#FF1A1A1A"
+            android:textSize="11sp" />
+
+    </LinearLayout>
+
+    <!-- ══ 3. TABLE HEADER ═══════════════════════════════════════════════════ -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="32dp"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:background="@color/card_dark"
+        android:paddingStart="10dp"
+        android:paddingEnd="10dp">
+
+        <TextView style="@style/HeaderCell" android:layout_width="0dp" android:layout_weight="2.5" android:text="LAST NAME" />
+        <TextView style="@style/HeaderCell" android:layout_width="0dp" android:layout_weight="3"   android:text="FIRST NAME" />
+        <TextView style="@style/HeaderCell" android:layout_width="0dp" android:layout_weight="1.8" android:text="NETWORK" />
+
+        <!-- Single attendance column -->
+        <TextView
+            android:id="@+id/tvAttHeader"
+            style="@style/HeaderCell"
+            android:layout_width="28dp"
+            android:text="✓" />
+
+        <!-- Delete col spacer -->
+        <View android:layout_width="30dp" android:layout_height="1dp" />
+
+    </LinearLayout>
+
+    <!-- ══ 4. DATA ROWS ═══════════════════════════════════════════════════════ -->
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1">
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/reviewRecyclerView"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:clipToPadding="false"
+            android:paddingBottom="16dp" />
+
+        <!-- Empty state -->
+        <LinearLayout
+            android:id="@+id/emptyStateLayout"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:orientation="vertical"
+            android:gravity="center"
+            android:padding="32dp"
+            android:visibility="gone">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="📄"
+                android:textSize="48sp" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:text="No attendance data found"
+                android:textColor="@color/text_primary"
+                android:textSize="18sp"
+                android:textStyle="bold"
+                android:gravity="center" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="The server could not extract any rows from the image.&#10;Try rescanning with better lighting, or use &quot;+ Add Member&quot; to enter rows manually."
+                android:textColor="@color/text_secondary"
+                android:textSize="13sp"
+                android:gravity="center"
+                android:lineSpacingMultiplier="1.4" />
+
+        </LinearLayout>
+
+    </FrameLayout>
+
+    <!-- ══ 5. BOTTOM ACTION BAR ══════════════════════════════════════════════ -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@color/card_dark"
+        android:orientation="vertical"
+        android:elevation="6dp"
+        android:paddingTop="8dp"
+        android:paddingBottom="8dp">
+
+        <!-- Row 1: Rescan | Add Member | Export CSV -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:paddingStart="8dp"
+            android:paddingEnd="8dp">
+
+            <!-- Rescan -->
+            <Button
+                android:id="@+id/btnRescan"
+                style="@style/Widget.MaterialComponents.Button.TextButton"
+                android:layout_width="0dp"
+                android:layout_height="40dp"
+                android:layout_weight="1"
+                android:text="↩ Rescan"
+                android:textColor="@color/text_secondary"
+                android:textSize="12sp" />
+
+            <!-- Add Member -->
+            <Button
+                android:id="@+id/btnAddRow"
+                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                android:layout_width="0dp"
+                android:layout_height="40dp"
+                android:layout_weight="1.3"
+                android:layout_marginStart="6dp"
+                android:layout_marginEnd="6dp"
+                android:text="+ Add Member"
+                android:textColor="@color/accent_blue"
+                android:textSize="12sp"
+                app:strokeColor="@color/accent_blue"
+                app:strokeWidth="1dp" />
+
+            <!-- Export CSV -->
+            <Button
+                android:id="@+id/btnExportCsv"
+                android:layout_width="0dp"
+                android:layout_height="40dp"
+                android:layout_weight="1.2"
+                android:text="Export CSV"
+                android:textColor="@android:color/white"
+                android:backgroundTint="@color/accent_blue"
+                android:textSize="12sp"
+                android:fontFamily="sans-serif-medium"
+                android:enabled="false"
+                android:alpha="0.4" />
+
+        </LinearLayout>
+
+        <!-- Purge deleted (only visible when rows are marked deleted) -->
+        <Button
+            android:id="@+id/btnPurgeDeleted"
+            style="@style/Widget.MaterialComponents.Button.TextButton"
+            android:layout_width="match_parent"
+            android:layout_height="36dp"
+            android:layout_marginTop="4dp"
+            android:text="Remove Deleted"
+            android:textColor="#FFE57373"
+            android:textSize="12sp"
+            android:visibility="gone" />
+
+    </LinearLayout>
+
+</LinearLayout>

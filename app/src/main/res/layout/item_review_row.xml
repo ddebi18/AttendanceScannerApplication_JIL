@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  item_review_row.xml
+  One member row in the review RecyclerView table.
+  Columns: Last Name | First Name | Network | 1 attendance checkbox | Delete
+-->
+<androidx.cardview.widget.CardView
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginStart="6dp"
+    android:layout_marginEnd="6dp"
+    android:layout_marginBottom="3dp"
+    app:cardCornerRadius="8dp"
+    app:cardElevation="1dp"
+    app:cardBackgroundColor="@color/card_dark">
+
+    <!-- Row background tint is set programmatically:
+         normal    → transparent
+         flagged   → yellow tint (#33FFEB3B)
+         manual    → blue tint  (#221E88E5)
+         deleted   → red tint   (#33E53935) -->
+
+    <LinearLayout
+        android:id="@+id/rowContainer"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingStart="4dp"
+        android:paddingEnd="2dp"
+        android:paddingTop="6dp"
+        android:paddingBottom="6dp"
+        android:minHeight="48dp">
+
+        <!-- Last Name (editable) — weight 2.5 -->
+        <TextView
+            android:id="@+id/tvLastName"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="2.5"
+            android:gravity="center_vertical"
+            android:paddingStart="4dp"
+            android:paddingEnd="2dp"
+            android:textColor="@color/text_primary"
+            android:textSize="12sp"
+            android:hint="Last name"
+            android:singleLine="true"
+            android:ellipsize="end"
+            android:background="?attr/selectableItemBackground" />
+
+        <!-- First Name (editable) — weight 3 -->
+        <TextView
+            android:id="@+id/tvFirstName"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="3"
+            android:gravity="center_vertical"
+            android:paddingStart="2dp"
+            android:paddingEnd="2dp"
+            android:textColor="@color/text_primary"
+            android:textSize="12sp"
+            android:hint="First name"
+            android:singleLine="true"
+            android:ellipsize="end"
+            android:background="?attr/selectableItemBackground" />
+
+        <!-- Network (editable) — weight 1.8 -->
+        <TextView
+            android:id="@+id/tvNetwork"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1.8"
+            android:gravity="center_vertical"
+            android:paddingStart="2dp"
+            android:paddingEnd="2dp"
+            android:textColor="@color/text_secondary"
+            android:textSize="11sp"
+            android:hint="NET"
+            android:singleLine="true"
+            android:background="?attr/selectableItemBackground" />
+
+        <!-- 10 attendance checkmark buttons (only 1 is visible at a time) -->
+        <!-- Sunday 1 -->
+        <ImageButton android:id="@+id/cbAtt0"  style="@style/AttCheckBtn" />
+        <ImageButton android:id="@+id/cbAtt1"  style="@style/AttCheckBtn" />
+        <!-- Sunday 2 -->
+        <ImageButton android:id="@+id/cbAtt2"  style="@style/AttCheckBtn" />
+        <ImageButton android:id="@+id/cbAtt3"  style="@style/AttCheckBtn" />
+        <!-- Sunday 3 -->
+        <ImageButton android:id="@+id/cbAtt4"  style="@style/AttCheckBtn" />
+        <ImageButton android:id="@+id/cbAtt5"  style="@style/AttCheckBtn" />
+        <!-- Sunday 4 -->
+        <ImageButton android:id="@+id/cbAtt6"  style="@style/AttCheckBtn" />
+        <ImageButton android:id="@+id/cbAtt7"  style="@style/AttCheckBtn" />
+        <!-- Sunday 5 -->
+        <ImageButton android:id="@+id/cbAtt8"  style="@style/AttCheckBtn" />
+        <ImageButton android:id="@+id/cbAtt9"  style="@style/AttCheckBtn" />
+
+        <!-- Delete button -->
+        <ImageButton
+            android:id="@+id/btnDeleteRow"
+            android:layout_width="30dp"
+            android:layout_height="30dp"
+            android:src="@android:drawable/ic_menu_delete"
+            android:tint="#FFE57373"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="Delete row"
+            android:padding="4dp" />
+
+    </LinearLayout>
+
+</androidx.cardview.widget.CardView>

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths>
+    <!-- Cache files (temp captured images) -->
+    <cache-path name="cache" path="." />
+    <!-- Downloads (exported CSV files) -->
+    <external-path name="downloads" path="Download/" />
+</paths>

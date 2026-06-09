@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Attendance Scanner — JIL Antipolo</string>
+    <string name="sunday_1">1st Sunday</string>
+    <string name="sunday_2">2nd Sunday</string>
+    <string name="sunday_3">3rd Sunday</string>
+    <string name="sunday_4">4th Sunday</string>
+    <string name="sunday_5">5th Sunday</string>
+    <string name="export_csv">Export CSV</string>
+    <string name="clear_all">Clear</string>
+    <string name="capture_photo">Capture Photo</string>
+</resources>

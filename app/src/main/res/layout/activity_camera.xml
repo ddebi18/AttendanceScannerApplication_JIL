@@ -1,0 +1,194 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  activity_camera.xml  v2
+  Two-state layout:
+    STATE A  viewfinderLayout  → live preview + edge overlay + SCAN button
+    STATE B  previewLayout     → still image + Retake / Use Photo
+-->
+<FrameLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#000000">
+
+    <!-- ══ STATE A: VIEWFINDER ════════════════════════════════════════════════ -->
+    <FrameLayout
+        android:id="@+id/viewfinderLayout"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:visibility="visible">
+
+        <!-- Live camera preview -->
+        <androidx.camera.view.PreviewView
+            android:id="@+id/previewView"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent" />
+
+        <!-- Document edge polygon overlay -->
+        <com.example.attendacejil.EdgeOverlayView
+            android:id="@+id/edgeOverlay"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent" />
+
+        <!-- Close button — top-left -->
+        <ImageButton
+            android:id="@+id/btnClose"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:layout_margin="16dp"
+            android:layout_gravity="top|start"
+            android:background="@drawable/circle_button_bg"
+            android:src="@android:drawable/ic_menu_close_clear_cancel"
+            android:contentDescription="Close camera"
+            android:tint="@android:color/white"
+            android:padding="10dp" />
+
+        <!-- Image count badge — top-right -->
+        <TextView
+            android:id="@+id/tvCameraCount"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="top|end"
+            android:layout_margin="16dp"
+            android:background="@drawable/badge_bg"
+            android:paddingStart="10dp"
+            android:paddingEnd="10dp"
+            android:paddingTop="4dp"
+            android:paddingBottom="4dp"
+            android:text="0 / 25"
+            android:textColor="@android:color/white"
+            android:textSize="12sp"
+            android:textStyle="bold" />
+
+        <!-- Bottom control area -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_gravity="bottom"
+            android:background="#CC000000"
+            android:orientation="vertical"
+            android:gravity="center_horizontal"
+            android:padding="20dp">
+
+            <!-- Detection status hint -->
+            <TextView
+                android:id="@+id/tvScanHint"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="16dp"
+                android:text="Align the attendance sheet within the frame"
+                android:textColor="#CCFFFFFF"
+                android:textSize="13sp"
+                android:gravity="center" />
+
+            <!-- Manual adjust hint (shown when confidence is low) -->
+            <TextView
+                android:id="@+id/tvAdjustHint"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="12dp"
+                android:text="Tap corners to adjust if needed"
+                android:textColor="#FFFF8F00"
+                android:textSize="11sp"
+                android:visibility="gone" />
+
+            <!-- SCAN button — large, prominent -->
+            <Button
+                android:id="@+id/btnScan"
+                android:layout_width="180dp"
+                android:layout_height="56dp"
+                android:text="SCAN"
+                android:textColor="@android:color/white"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                android:fontFamily="sans-serif-medium"
+                android:backgroundTint="@color/accent_blue"
+                android:enabled="false"
+                android:alpha="0.4"
+                android:letterSpacing="0.12" />
+
+        </LinearLayout>
+
+    </FrameLayout>
+
+    <!-- ══ STATE B: POST-CAPTURE PREVIEW ═════════════════════════════════════ -->
+    <FrameLayout
+        android:id="@+id/previewLayout"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:visibility="gone">
+
+        <!-- Captured image fills screen -->
+        <ImageView
+            android:id="@+id/imgPreview"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:scaleType="fitCenter"
+            android:background="#000000"
+            android:contentDescription="Captured attendance sheet preview" />
+
+        <!-- Top bar -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_gravity="top"
+            android:background="#CC000000"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:padding="14dp">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Scanned Image"
+                android:textColor="@android:color/white"
+                android:textSize="15sp"
+                android:textStyle="bold" />
+
+        </LinearLayout>
+
+        <!-- Bottom: Retake | Use Photo -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_gravity="bottom"
+            android:background="#CC000000"
+            android:orientation="horizontal"
+            android:padding="16dp"
+            android:gravity="center"
+            android:weightSum="2">
+
+            <Button
+                android:id="@+id/btnRetake"
+                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                android:layout_width="0dp"
+                android:layout_height="52dp"
+                android:layout_weight="1"
+                android:layout_marginEnd="8dp"
+                android:text="↩  Retake"
+                android:textColor="@android:color/white"
+                android:backgroundTint="#00000000"
+                app:strokeColor="@android:color/white"
+                app:strokeWidth="1dp"
+                android:textSize="15sp"
+                android:fontFamily="sans-serif-medium" />
+
+            <Button
+                android:id="@+id/btnAccept"
+                android:layout_width="0dp"
+                android:layout_height="52dp"
+                android:layout_weight="1"
+                android:layout_marginStart="8dp"
+                android:text="✓  Use Photo"
+                android:textColor="@android:color/white"
+                android:backgroundTint="#FF2E7D32"
+                android:textSize="15sp"
+                android:fontFamily="sans-serif-medium" />
+
+        </LinearLayout>
+
+    </FrameLayout>
+
+</FrameLayout>

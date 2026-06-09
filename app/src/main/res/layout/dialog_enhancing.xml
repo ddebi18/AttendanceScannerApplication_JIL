@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  dialog_enhancing.xml
+  Loading dialog shown while the image is being enhanced on the server.
+  Matches the existing dialog_scanning.xml design language.
+-->
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="280dp"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:background="@drawable/dialog_bg"
+    android:gravity="center_horizontal"
+    android:padding="28dp">
+
+    <!-- Indeterminate progress -->
+    <com.google.android.material.progressindicator.CircularProgressIndicator
+        android:layout_width="48dp"
+        android:layout_height="48dp"
+        android:indeterminate="true"
+        app:indicatorColor="#FFFF9800"
+        app:trackColor="#33FF9800"
+        app:indicatorSize="48dp"
+        app:trackThickness="4dp"
+        android:layout_marginBottom="20dp" />
+
+    <!-- Title -->
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Enhancing Image"
+        android:textColor="#FFFFFFFF"
+        android:textSize="16sp"
+        android:textStyle="bold"
+        android:fontFamily="sans-serif-medium"
+        android:layout_marginBottom="6dp" />
+
+    <!-- Status -->
+    <TextView
+        android:id="@+id/tvEnhanceStatus"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Processing document…"
+        android:textColor="#FF9E9E9E"
+        android:textSize="13sp"
+        android:gravity="center" />
+
+</LinearLayout>

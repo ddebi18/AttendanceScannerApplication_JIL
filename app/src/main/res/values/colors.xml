@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Background -->
+    <color name="bg_dark">#FF121212</color>
+    <color name="card_dark">#FF1E1E2E</color>
+
+    <!-- Accent -->
+    <color name="accent_blue">#FF1E88E5</color>
+    <color name="accent_blue_dark">#FF1565C0</color>
+
+    <!-- Text -->
+    <color name="text_primary">#FFFFFFFF</color>
+    <color name="text_secondary">#FF9E9E9E</color>
+
+    <!-- Sunday selector states -->
+    <color name="sunday_active">#FF1E88E5</color>
+    <color name="sunday_inactive">#FF2C2C3E</color>
+
+    <!-- Service selector states -->
+    <color name="service_active">#FF2E7D32</color>
+    <color name="service_inactive">#FF2C2C3E</color>
+
+    <!-- Stats card -->
+    <color name="stats_card">#FF1A1A2A</color>
+    <color name="accent_green">#FF4CAF50</color>
+
+    <!-- Review table row states -->
+    <color name="row_flagged">#33FFEB3B</color>
+    <color name="row_manual">#221E88E5</color>
+    <color name="row_deleted">#44E53935</color>
+
+    <!-- Status colours (kept for theme compatibility) -->
+    <color name="colorPrimary">#FF1E88E5</color>
+    <color name="colorPrimaryVariant">#FF1565C0</color>
+    <color name="colorOnPrimary">#FFFFFFFF</color>
+    <color name="colorSecondary">#FF03DAC5</color>
+    <color name="colorSecondaryVariant">#FF018786</color>
+    <color name="colorOnSecondary">#FF000000</color>
+    <color name="colorError">#FFE53935</color>
+    <color name="colorOnError">#FFFFFFFF</color>
+    <color name="colorBackground">#FF121212</color>
+    <color name="colorOnBackground">#FFFFFFFF</color>
+    <color name="colorSurface">#FF1E1E2E</color>
+    <color name="colorOnSurface">#FFFFFFFF</color>
+</resources>

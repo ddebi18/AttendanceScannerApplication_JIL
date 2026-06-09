@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- Permissions -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
+        android:maxSdkVersion="28" />
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
+        android:maxSdkVersion="32" />
+
+    <uses-feature android:name="android.hardware.camera" android:required="true" />
+
+    <application
+        android:allowBackup="true"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="@xml/backup_rules"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.AttendaceJIL"
+        android:usesCleartextTraffic="true">
+
+        <!-- MainActivity — portrait + landscape, orientation-aware -->
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:configChanges="orientation|screenSize|screenLayout"
+            android:screenOrientation="fullSensor">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!-- CameraActivity — fullSensor so the viewfinder rotates naturally -->
+        <activity
+            android:name=".CameraActivity"
+            android:exported="false"
+            android:configChanges="orientation|screenSize|screenLayout"
+            android:screenOrientation="fullSensor" />
+
+        <!-- ReviewActivity — fullSensor for landscape table scrolling -->
+        <activity
+            android:name=".ReviewActivity"
+            android:exported="false"
+            android:configChanges="orientation|screenSize|screenLayout"
+            android:screenOrientation="fullSensor" />
+
+        <!-- PreviewActivity (retained for future use) -->
+        <activity
+            android:name=".PreviewActivity"
+            android:exported="false"
+            android:configChanges="orientation|screenSize|screenLayout"
+            android:screenOrientation="fullSensor" />
+
+        <!-- FileProvider for sharing exported CSV via Intent.ACTION_SEND -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.provider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_provider_paths" />
+        </provider>
+
+    </application>
+
+</manifest>
