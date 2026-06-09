@@ -66,6 +66,7 @@ public class MainActivity extends AppCompatActivity {
     // ── Selection state ───────────────────────────────────────────────────────
     private int selectedSunday  = 1;   // 1–5
     private int selectedService = 0;   // 0 = none, 1 = 1st, 2 = 2nd
+    private java.util.Calendar selectedCalendar = java.util.Calendar.getInstance();
 
     // ── Views ─────────────────────────────────────────────────────────────────
     private TextView       chipSunday, chipService;
@@ -113,6 +114,20 @@ public class MainActivity extends AppCompatActivity {
         fabCamera         = findViewById(R.id.fabCamera);
         fabGallery        = findViewById(R.id.fabGallery);
         fabEnhance        = findViewById(R.id.fabEnhance);
+
+        findViewById(R.id.btnBatchScan).setOnClickListener(v -> {
+            Intent intent = new Intent(this, BatchMonthlyActivity.class);
+            startActivity(intent);
+        });
+
+        tvSessionMonth.setOnClickListener(v -> {
+            new android.app.DatePickerDialog(this, (view, y, m, d) -> {
+                selectedCalendar.set(java.util.Calendar.YEAR, y);
+                selectedCalendar.set(java.util.Calendar.MONTH, m);
+                updateSessionCard();
+                refreshChipsAndFab();
+            }, selectedCalendar.get(java.util.Calendar.YEAR), selectedCalendar.get(java.util.Calendar.MONTH), 1).show();
+        });
 
         sundayBtns = new Button[]{
             findViewById(R.id.btn1stSunday),
@@ -187,12 +202,11 @@ public class MainActivity extends AppCompatActivity {
     // ── Stats / chip refresh ──────────────────────────────────────────────────
 
     private void updateSessionCard() {
-        Calendar cal = Calendar.getInstance();
-        String month = new SimpleDateFormat("MMM", Locale.getDefault())
-                .format(cal.getTime()).toUpperCase(Locale.getDefault());
+        String month = new SimpleDateFormat("MMM yyyy", Locale.getDefault())
+                .format(selectedCalendar.getTime()).toUpperCase(Locale.getDefault());
         tvSessionMonth.setText(month);
 
-        int totalSundays = countSundaysInMonth(cal);
+        int totalSundays = countSundaysInMonth(selectedCalendar);
         tvSessionWeek.setText("Week " + selectedSunday + " of " + totalSundays);
     }
 
@@ -215,7 +229,7 @@ public class MainActivity extends AppCompatActivity {
 
         // Service chip
         if (selectedService == 1) {
-            chipService.setText("1st Service · 7:30am");
+            chipService.setText("1st Service · 7:00am");
         } else if (selectedService == 2) {
             chipService.setText("2nd Service · 9:00am");
         } else {
@@ -225,7 +239,7 @@ public class MainActivity extends AppCompatActivity {
         // Stats card
         tvSelectedSunday.setText(ordinals[selectedSunday - 1]);
         if (selectedService == 1) {
-            tvSelectedService.setText("1st Service · 7:30am");
+            tvSelectedService.setText("1st Service · 7:00am");
         } else if (selectedService == 2) {
             tvSelectedService.setText("2nd Service · 9:00am");
         } else {
@@ -335,9 +349,9 @@ public class MainActivity extends AppCompatActivity {
                     }
 
                     if (!uris.isEmpty()) {
-                        if (uris.size() > 15) {
-                            showToast("You can only select up to 15 images.");
-                            uris = uris.subList(0, 15);
+                        if (uris.size() > 30) {
+                            showToast("You can only select up to 30 images.");
+                            uris = uris.subList(0, 30);
                         }
                         enhanceUrisSequentially(uris);
                     }
@@ -358,6 +372,9 @@ public class MainActivity extends AppCompatActivity {
             batchDialog.getWindow().setBackgroundDrawableResource(android.R.color.transparent);
         }
         batchDialog.setCancelable(false);
+
+        // Keep screen on during scanning to prevent activity destruction
+        getWindow().addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
 
         com.google.android.material.progressindicator.LinearProgressIndicator progressBar =
                 batchDialog.findViewById(R.id.batchProgressBar);
@@ -394,6 +411,7 @@ public class MainActivity extends AppCompatActivity {
 
         if (index[0] >= total) {
             batchDialog.dismiss();
+            getWindow().clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
             openReviewWithRows(allRows);
             return;
         }
@@ -445,8 +463,11 @@ public class MainActivity extends AppCompatActivity {
                             //noinspection ResultOfMethodCallIgnored
                             tmp.delete();
                             index[0]++;
-                            processNextUri(uris, index, allRows, batchDialog,
-                                    progressBar, tvCounter, tvPercent, tvStatus);
+                            runOnUiThread(() -> tvStatus.setText("Cooling down (4.5s)..."));
+                            new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
+                                processNextUri(uris, index, allRows, batchDialog,
+                                        progressBar, tvCounter, tvPercent, tvStatus);
+                            }, 4500);
                         }
 
                         @Override
@@ -456,8 +477,11 @@ public class MainActivity extends AppCompatActivity {
                             //noinspection ResultOfMethodCallIgnored
                             tmp.delete();
                             index[0]++;
-                            processNextUri(uris, index, allRows, batchDialog,
-                                    progressBar, tvCounter, tvPercent, tvStatus);
+                            runOnUiThread(() -> tvStatus.setText("Cooling down (4.5s)..."));
+                            new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
+                                processNextUri(uris, index, allRows, batchDialog,
+                                        progressBar, tvCounter, tvPercent, tvStatus);
+                            }, 4500);
                         }
                     });
 
@@ -528,6 +552,8 @@ public class MainActivity extends AppCompatActivity {
         intent.putExtra(ReviewActivity.EXTRA_SUNDAY,    selectedSunday);
         intent.putExtra(ReviewActivity.EXTRA_SERVICE,   selectedService);
         intent.putExtra(ReviewActivity.EXTRA_FLAGGED,   flaggedCount);
+        intent.putExtra(ReviewActivity.EXTRA_YEAR,      selectedCalendar.get(java.util.Calendar.YEAR));
+        intent.putExtra(ReviewActivity.EXTRA_MONTH,     selectedCalendar.get(java.util.Calendar.MONTH));
         startActivity(intent);
     }
 
@@ -552,6 +578,9 @@ public class MainActivity extends AppCompatActivity {
             dialog.getWindow().setBackgroundDrawableResource(android.R.color.transparent);
         }
         dialog.setCancelable(false);
+
+        // Keep screen on during scanning to prevent activity destruction
+        getWindow().addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
 
         TextView tvStatus = dialog.findViewById(R.id.tvScanStatus);
         dialog.show();
@@ -588,6 +617,7 @@ public class MainActivity extends AppCompatActivity {
                                            @NonNull Response<ResponseBody> resp) {
                         statusHandler.removeCallbacks(statusCycler);
                         dialog.dismiss();
+                        getWindow().clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
                         if (resp.isSuccessful() && resp.body() != null) {
                             try {
                                 openReview(resp.body().string());
@@ -605,6 +635,7 @@ public class MainActivity extends AppCompatActivity {
                                           @NonNull Throwable t) {
                         statusHandler.removeCallbacks(statusCycler);
                         dialog.dismiss();
+                        getWindow().clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
                         showToast("Network error: " + t.getMessage());
                     }
                 });
@@ -628,6 +659,8 @@ public class MainActivity extends AppCompatActivity {
         intent.putExtra(ReviewActivity.EXTRA_SUNDAY,    selectedSunday);
         intent.putExtra(ReviewActivity.EXTRA_SERVICE,   selectedService);
         intent.putExtra(ReviewActivity.EXTRA_FLAGGED,   flaggedCount);
+        intent.putExtra(ReviewActivity.EXTRA_YEAR,      selectedCalendar.get(java.util.Calendar.YEAR));
+        intent.putExtra(ReviewActivity.EXTRA_MONTH,     selectedCalendar.get(java.util.Calendar.MONTH));
         startActivity(intent);
     }
 

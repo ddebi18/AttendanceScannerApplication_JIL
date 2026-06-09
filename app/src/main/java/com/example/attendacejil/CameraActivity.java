@@ -121,7 +121,7 @@ public class CameraActivity extends AppCompatActivity {
         cameraExecutor = Executors.newSingleThreadExecutor();
 
         int count = getIntent().getIntExtra(EXTRA_IMAGE_COUNT, 0);
-        tvCameraCount.setText(count + " / 25");
+        tvCameraCount.setText(count + " / 30");
 
         ((ImageButton) findViewById(R.id.btnClose)).setOnClickListener(v -> finish());
         btnScan  .setOnClickListener(v -> capturePhoto());

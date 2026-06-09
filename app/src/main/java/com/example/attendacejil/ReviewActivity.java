@@ -61,9 +61,11 @@ public class ReviewActivity extends AppCompatActivity
 
     // Intent extras — in
     public static final String EXTRA_ROWS_JSON = "rows_json";
-    public static final String EXTRA_SUNDAY    = "sunday_num";
-    public static final String EXTRA_SERVICE   = "service_num";
-    public static final String EXTRA_FLAGGED   = "flagged_count";
+    public static final String EXTRA_SUNDAY    = "sunday";
+    public static final String EXTRA_SERVICE   = "service";
+    public static final String EXTRA_FLAGGED   = "flagged";
+    public static final String EXTRA_YEAR      = "year";
+    public static final String EXTRA_MONTH     = "month";
 
     // ── UI ────────────────────────────────────────────────────────────────────
     private RecyclerView   recyclerView;
@@ -75,21 +77,109 @@ public class ReviewActivity extends AppCompatActivity
 
     // ── Data ──────────────────────────────────────────────────────────────────
     private final List<AttendanceRow> rows = new ArrayList<>();
-    private int sundayNum  = 1;
-    private int serviceNum = 1;
+    private int sundayNum, serviceNum;
+    private int selectedYear, selectedMonth;
 
     // ─── Lifecycle ────────────────────────────────────────────────────────────
 
-    @Override
-    protected void onCreate(Bundle savedInstanceState) {
+    @Override    protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_review);
 
         bindViews();
-        parseIntent();
+        
+        if (savedInstanceState != null && savedInstanceState.containsKey("saved_rows")) {
+            // Restore from saved state (process death recovery)
+            restoreFromSavedState(savedInstanceState);
+        } else {
+            parseIntent();
+        }
+        
         setupRecyclerView();
         setupButtons();
         refreshBannerAndExport();
+    }
+    
+    @Override
+    protected void onSaveInstanceState(@NonNull Bundle outState) {
+        super.onSaveInstanceState(outState);
+        outState.putInt("sunday", sundayNum);
+        outState.putInt("service", serviceNum);
+        outState.putInt("year", selectedYear);
+        outState.putInt("month", selectedMonth);
+        
+        // Serialize current rows (with user edits) back to JSON
+        try {
+            org.json.JSONArray arr = new org.json.JSONArray();
+            for (AttendanceRow r : rows) {
+                org.json.JSONObject obj = new org.json.JSONObject();
+                obj.put("last_name", r.lastName);
+                obj.put("last_name_conf", r.lastNameConf);
+                obj.put("first_name", r.firstName);
+                obj.put("first_name_conf", r.firstNameConf);
+                obj.put("network", r.network);
+                obj.put("network_conf", r.networkConf);
+                obj.put("flagged", r.flagged);
+                obj.put("manually_added", r.manuallyAdded);
+                obj.put("marked_for_deletion", r.markedForDeletion);
+                org.json.JSONArray attArr = new org.json.JSONArray();
+                for (boolean b : r.attendance) attArr.put(b);
+                obj.put("attendance", attArr);
+                arr.put(obj);
+            }
+            outState.putString("saved_rows", arr.toString());
+        } catch (Exception e) {
+            // Fallback: save original intent data
+            String json = getIntent().getStringExtra(EXTRA_ROWS_JSON);
+            if (json != null) outState.putString("saved_rows", json);
+        }
+    }
+    
+    private void restoreFromSavedState(Bundle savedInstanceState) {
+        sundayNum = savedInstanceState.getInt("sunday", 1);
+        serviceNum = savedInstanceState.getInt("service", 1);
+        selectedYear = savedInstanceState.getInt("year", java.util.Calendar.getInstance().get(java.util.Calendar.YEAR));
+        selectedMonth = savedInstanceState.getInt("month", java.util.Calendar.getInstance().get(java.util.Calendar.MONTH));
+        
+        String json = savedInstanceState.getString("saved_rows", "[]");
+        parseRowsJsonWithState(json);
+    }
+    
+    private void parseRowsJsonWithState(String json) {
+        try {
+            org.json.JSONArray arr = new org.json.JSONArray(json);
+            for (int i = 0; i < arr.length(); i++) {
+                org.json.JSONObject obj = arr.getJSONObject(i);
+                
+                String lastName   = obj.optString("last_name",  "");
+                int    lastConf   = obj.optInt   ("last_name_conf",  0);
+                String firstName  = obj.optString("first_name", "");
+                int    firstConf  = obj.optInt   ("first_name_conf", 0);
+                String network    = obj.optString("network",    "");
+                int    netConf    = obj.optInt   ("network_conf",    0);
+                boolean flagged   = obj.optBoolean("flagged",   false);
+                
+                boolean[] att = new boolean[10];
+                org.json.JSONArray attArr = obj.optJSONArray("attendance");
+                if (attArr != null) {
+                    for (int j = 0; j < Math.min(attArr.length(), 10); j++) {
+                        att[j] = attArr.optBoolean(j, false);
+                    }
+                }
+                
+                AttendanceRow row = new AttendanceRow(
+                        lastName, lastConf,
+                        firstName, firstConf,
+                        network, netConf,
+                        att, flagged);
+                row.manuallyAdded = obj.optBoolean("manually_added", false);
+                row.markedForDeletion = obj.optBoolean("marked_for_deletion", false);
+                rows.add(row);
+            }
+        } catch (Exception e) {
+            android.widget.Toast.makeText(this, "Could not restore state: " + e.getMessage(),
+                    android.widget.Toast.LENGTH_LONG).show();
+        }
     }
 
     // ── View binding ──────────────────────────────────────────────────────────
@@ -107,8 +197,13 @@ public class ReviewActivity extends AppCompatActivity
     // ── Parse intent extras ───────────────────────────────────────────────────
 
     private void parseIntent() {
-        sundayNum  = getIntent().getIntExtra(EXTRA_SUNDAY,  1);
+        sundayNum  = getIntent().getIntExtra(EXTRA_SUNDAY, 1);
         serviceNum = getIntent().getIntExtra(EXTRA_SERVICE, 1);
+        
+        java.util.Calendar now = java.util.Calendar.getInstance();
+        selectedYear = getIntent().getIntExtra(EXTRA_YEAR, now.get(java.util.Calendar.YEAR));
+        selectedMonth = getIntent().getIntExtra(EXTRA_MONTH, now.get(java.util.Calendar.MONTH));
+        
         String json = getIntent().getStringExtra(EXTRA_ROWS_JSON);
         if (json != null) {
             parseRowsJson(json);
@@ -232,7 +327,7 @@ public class ReviewActivity extends AppCompatActivity
         bannerFlagged.setVisibility(View.VISIBLE);
         if (flaggedCount > 0) {
             tvBannerText.setText("⚠ " + flaggedCount
-                    + " name(s) need review — tap to fix, then mark attendance ✓");
+                    + " name(s) highlighted for review (yellow) — fix if needed, then export");
         } else {
             tvBannerText.setText("Tap ✓ on each person who attended this service");
         }
@@ -240,11 +335,12 @@ public class ReviewActivity extends AppCompatActivity
         // Purge button
         btnPurgeDeleted.setVisibility(hasDeleted ? View.VISIBLE : View.GONE);
 
-        // Export button: enabled only when no flagged AND no empty required fields
+        // Export button: enabled when no empty required fields
         // AND at least one non-deleted row exists
+        // Flagged rows are allowed — they are just highlighted yellow for visual review
         long activeRows = rows.stream()
                 .filter(r -> !r.markedForDeletion).count();
-        boolean canExport = (flaggedCount == 0) && !anyInvalid && (activeRows > 0);
+        boolean canExport = !anyInvalid && (activeRows > 0);
         btnExportCsv.setEnabled(canExport);
         btnExportCsv.setAlpha(canExport ? 1.0f : 0.4f);
     }
@@ -272,10 +368,12 @@ public class ReviewActivity extends AppCompatActivity
             payload.put("sunday_num",  sundayNum);
             payload.put("service_num", serviceNum);
 
-            Calendar cal = Calendar.getInstance();
-            payload.put("month", new SimpleDateFormat("MMMM", Locale.getDefault())
-                    .format(cal.getTime()).toUpperCase(Locale.getDefault()));
-            payload.put("year", cal.get(Calendar.YEAR));
+            java.util.Calendar cal = java.util.Calendar.getInstance();
+            cal.set(java.util.Calendar.YEAR, selectedYear);
+            cal.set(java.util.Calendar.MONTH, selectedMonth);
+            payload.put("month", new java.text.SimpleDateFormat("MMMM", java.util.Locale.getDefault())
+                    .format(cal.getTime()).toUpperCase(java.util.Locale.getDefault()));
+            payload.put("year", selectedYear);
 
             JSONArray rowsArr = new JSONArray();
             for (AttendanceRow r : rows) {
@@ -330,17 +428,19 @@ public class ReviewActivity extends AppCompatActivity
             String fname = "attendance_export.csv";
             String contentDisp = body.contentType() != null ? "" : "";
             // Retrofit exposes headers via the raw response — read it from the callback
-            // Fallback: build the expected name locally
-            Calendar cal   = Calendar.getInstance();
+            java.util.Calendar cal   = java.util.Calendar.getInstance();
+            cal.set(java.util.Calendar.YEAR, selectedYear);
+            cal.set(java.util.Calendar.MONTH, selectedMonth);
+            
             String month   = new java.text.SimpleDateFormat("MMM", Locale.getDefault())
                     .format(cal.getTime()).toUpperCase(Locale.getDefault());
             String[] ords  = {"", "1ST", "2ND", "3RD", "4TH", "5TH"};
             String svcLbl  = (serviceNum >= 1 && serviceNum <= 5 ? ords[serviceNum] : "1ST");
 
             // Compute the Sunday date for the filename (Nth Sunday of the month)
-            int yr = cal.get(java.util.Calendar.YEAR);
+            int yr = selectedYear;
             java.util.Calendar firstOfMonth = java.util.Calendar.getInstance();
-            firstOfMonth.set(yr, cal.get(java.util.Calendar.MONTH), 1);
+            firstOfMonth.set(yr, selectedMonth, 1);
             int dayOfWeek = firstOfMonth.get(java.util.Calendar.DAY_OF_WEEK);
             int firstSunOffset = (java.util.Calendar.SUNDAY - dayOfWeek + 7) % 7;
             int sundayDay = 1 + firstSunOffset + (sundayNum - 1) * 7;

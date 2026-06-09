@@ -164,7 +164,9 @@ Return ONLY valid JSON — no markdown fences, no explanation:
 
 Rules:
 - SKIP the header row ("LAST NAME", "FIRST NAME", "NETWORK" labels) and any title rows at the top.
+- CRITICAL: Return the rows in the EXACT physical top-to-bottom order as they appear on the page. DO NOT sort them alphabetically.
 - Include ALL person data rows — even those with no check marks.
+- CRITICAL: The physical document has separate columns for LAST NAME and FIRST NAME. You MUST extract them into separate fields exactly as written. DO NOT concatenate the first name into the last_name field. If a column is blank, leave its field empty.
 - The "attendance" list must contain exactly 10 boolean values corresponding to the 10 columns. Set each to true only if there is a visible check mark, tick (✓), slash (/), or any written mark in that column's cell for that person. If the cell is empty, set it to false.
 - Use UPPERCASE for all name and network values.
 - Do NOT read vertical cell border lines as part of a name. If a name begins with a stray "I", "L", or "J" that is clearly a grid line artifact, drop that leading character.
@@ -185,12 +187,56 @@ def _resize(image: np.ndarray, max_width: int = MAX_WIDTH) -> np.ndarray:
     return image
 
 
+def _decode_image(img_bytes: bytes) -> np.ndarray:
+    """Decodes image bytes into a BGR numpy array, applying EXIF rotation if present."""
+    from PIL import Image, ImageOps
+    try:
+        pil_img = Image.open(io.BytesIO(img_bytes))
+        pil_img = ImageOps.exif_transpose(pil_img)
+        rgb = np.array(pil_img.convert("RGB"))
+        return cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR)
+    except Exception as e:
+        log.warning("  PIL decode failed: %s. Falling back to cv2.imdecode.", e)
+        nparr = np.frombuffer(img_bytes, np.uint8)
+        return cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+
+
 def _auto_orient(image: np.ndarray) -> np.ndarray:
-    """Rotate landscape images to portrait."""
+    """Ensure the image is upright. Uses EXIF first (via _decode_image), then OSD if available."""
     h, w = image.shape[:2]
+    
+    if OCR_AVAILABLE:
+        try:
+            # Resize down for speed
+            scale = 800.0 / max(h, w)
+            small = cv2.resize(image, (0, 0), fx=scale, fy=scale)
+            # Convert to RGB for pytesseract
+            small_rgb = cv2.cvtColor(small, cv2.COLOR_BGR2RGB)
+            pil_small = PILImage.fromarray(small_rgb)
+            
+            osd = pytesseract.image_to_osd(pil_small, output_type=pytesseract.Output.DICT)
+            rot = osd.get("rotate", 0)
+            
+            if rot == 90:
+                log.info("  OSD: rotating 90 CW")
+                return cv2.rotate(image, cv2.ROTATE_90_CLOCKWISE)
+            elif rot == 180:
+                log.info("  OSD: rotating 180")
+                return cv2.rotate(image, cv2.ROTATE_180)
+            elif rot == 270:
+                log.info("  OSD: rotating 90 CCW")
+                return cv2.rotate(image, cv2.ROTATE_90_COUNTERCLOCKWISE)
+            
+            log.info("  OSD: image is upright (0 deg).")
+            return image
+        except Exception as e:
+            log.warning("  OSD orientation failed: %s", e)
+
+    # Fallback: if it's landscape, blindly rotate CW
     if w > h:
-        image = cv2.rotate(image, cv2.ROTATE_90_CLOCKWISE)
-        log.info("  Auto-rotated landscape → portrait (%dx%d → %dx%d)", w, h, h, w)
+        log.info("  Fallback: rotating landscape → portrait 90 CW")
+        return cv2.rotate(image, cv2.ROTATE_90_CLOCKWISE)
+        
     return image
 
 
@@ -665,9 +711,9 @@ def _find_att_split(binary: np.ndarray) -> int:
     v_proj = np.sum(vert, axis=0).astype(np.float32)
 
     # The JIL attendance sheet text columns (Last/First/Network) occupy
-    # roughly 55-65% of page width.  Search 50-80% for the first strong
+    # roughly 50-55% of page width.  Search 35-75% for the first strong
     # vertical-line cluster that marks the start of the attendance grid.
-    x_lo, x_hi = int(w * 0.50), int(w * 0.80)
+    x_lo, x_hi = int(w * 0.35), int(w * 0.75)
     region = v_proj[x_lo:x_hi]
     if region.max() > 0:
         thresh = region.max() * 0.4
@@ -677,9 +723,9 @@ def _find_att_split(binary: np.ndarray) -> int:
             log.info("  att split detected at x=%d (%.0f%%)", split, 100*split/w)
             return split
 
-    # Fallback: ~62% of width (JIL sheet layout)
-    fallback = int(w * 0.62)
-    log.info("  att split fallback x=%d (62%%)", fallback)
+    # Fallback: ~53% of width (JIL sheet layout — observed across test images)
+    fallback = int(w * 0.53)
+    log.info("  att split fallback x=%d (%.0f%%)", fallback, 100*fallback/w)
     return fallback
 
 def _find_text_col_splits(binary: np.ndarray, att_x0: int) -> tuple:
@@ -854,34 +900,94 @@ def _process_image_with_gemini(img_bytes: bytes,
             time.sleep(wait)
         _gemini_last_call_ts = time.time()
 
-    # Single attempt with one retry as safety net.
+    GEMINI_FALLBACK_MODELS = [
+        "gemini-2.5-flash",
+        "gemini-2.5-flash-lite",
+        "gemini-2.0-flash",
+        "gemini-2.0-flash-lite",
+        "gemini-flash-latest",
+        "gemini-flash-lite-latest",
+        "gemini-pro-latest",
+        "gemini-2.5-pro"
+    ]
+    
     last_exc = None
-    for attempt, wait in enumerate([0, 8], start=1):
-        if wait:
-            log.info("  Gemini 429 — back-off %ds (attempt %d/2)...", wait, attempt)
-            time.sleep(wait)
-        try:
-            resp = http_requests.post(
-                GEMINI_URL,
-                params={"key": GEMINI_API_KEY},
-                json=payload,
-                timeout=60
-            )
-            if resp.status_code == 429:
-                last_exc = Exception(f"429 rate limit (attempt {attempt})")
-                continue
-            resp.raise_for_status()
-            break
-        except http_requests.exceptions.HTTPError as e:
-            if resp.status_code == 429:
+    raw_text = None
+    
+    for model_name in GEMINI_FALLBACK_MODELS:
+        gemini_url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent"
+        
+        # Try up to 2 times per model respecting RetryDelay from Google.
+        model_failed = False
+        for attempt in range(1, 3):
+            try:
+                resp = http_requests.post(
+                    gemini_url,
+                    params={"key": GEMINI_API_KEY},
+                    json=payload,
+                    timeout=60
+                )
+                if resp.status_code == 429:
+                    log.warning("%s 429 payload: %s", model_name, resp.text)
+                    
+                    delay = 8.0 # default fallback
+                    try:
+                        err_data = resp.json()
+                        for detail in err_data.get("error", {}).get("details", []):
+                            if "retryDelay" in detail:
+                                delay_str = detail["retryDelay"].replace("s", "")
+                                delay = float(delay_str) + 0.5
+                                break
+                    except Exception:
+                        pass
+                    
+                    # If Google tells us to wait > 20s, it's a daily/hard quota exhaustion.
+                    # Switch to the next model immediately instead of waiting.
+                    if delay > 20.0:
+                        log.info("  %s 429 quota exhausted (delay %.1fs) -> switching to next model", model_name, delay)
+                        model_failed = True
+                        last_exc = Exception(f"{model_name} quota exhausted")
+                        break
+                        
+                    delay = min(delay, 100.0)
+                    last_exc = Exception(f"429 rate limit (attempt {attempt}). Pausing {delay:.1f}s.")
+                    log.info("  %s 429 — back-off %.1fs (attempt %d/2)...", model_name, delay, attempt)
+                    time.sleep(delay)
+                    continue
+                    
+                resp.raise_for_status()
+                # SUCCESS! Extract text and break out of the attempt loop
+                raw_text = resp.json()["candidates"][0]["content"]["parts"][0]["text"]
+                model_failed = False
+                break
+                
+            except http_requests.exceptions.HTTPError as e:
+                if resp.status_code in (429, 503):
+                    log.warning("%s %d payload: %s", model_name, resp.status_code, resp.text)
+                    if resp.status_code == 503:
+                        log.info("  %s 503 unavailable -> switching to next model", model_name)
+                        model_failed = True
+                        last_exc = Exception(f"{model_name} unavailable")
+                        break
+                    last_exc = e
+                    log.info("  %s HTTPError — back-off 8s (attempt %d/2)...", model_name, attempt)
+                    time.sleep(8)
+                    continue
+                if resp.status_code == 404:
+                    log.info("  %s 404 not found -> switching to next model", model_name)
+                    model_failed = True
+                    break
+                raise
+            except Exception as e:
                 last_exc = e
-                continue
-            raise
+                model_failed = True
+                break
+                
+        if not model_failed and raw_text is not None:
+            break # We got a successful response from this model!
     else:
-        raise last_exc or RuntimeError("Gemini rate-limited after retries")
+        raise last_exc or RuntimeError("All Gemini models exhausted or rate-limited")
 
-    raw_text = (resp.json()
-                ["candidates"][0]["content"]["parts"][0]["text"])
 
     # Strip markdown fences if present
     cleaned = raw_text.strip()
@@ -943,47 +1049,72 @@ def _enhance_for_gemini(img_bytes: bytes) -> bytes:
       6. Re-encode as high-quality JPEG
     Returns the enhanced image as JPEG bytes.
     """
-    nparr = np.frombuffer(img_bytes, np.uint8)
-    bgr   = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
-    if bgr is None:
+    bgr = _decode_image(img_bytes)
+    if bgr is None or bgr.size == 0:
         log.warning("  _enhance_for_gemini: could not decode image — using raw bytes.")
         return img_bytes
 
-    bgr = _auto_orient(bgr)
-    bgr = _resize(bgr, max_width=1600)
+    img_bgr = _auto_orient(bgr)
+    img_bgr = _resize(img_bgr, max_width=1600)
 
-    # Perspective correction — only if the detected quad covers > 40% of image
-    h_img, w_img = bgr.shape[:2]
-    img_area = h_img * w_img
-    corners = _find_document_corners(bgr)
-    if corners is not None:
-        quad_area = float(cv2.contourArea(corners))
-        if quad_area >= img_area * 0.40:
-            try:
-                bgr = _perspective_warp(bgr, corners)
-                log.info("  Gemini pre-warp applied (quad=%.0f%%).",
-                         100 * quad_area / img_area)
-            except Exception as e:
-                log.warning("  Gemini pre-warp failed: %s", e)
-        else:
-            log.info("  Gemini pre-warp SKIPPED (quad=%.0f%% < 40%%).",
-                     100 * quad_area / img_area)
+    # 1. Mathematically Perfect Paper Cropping
+    grid_corners = _find_document_corners(img_bgr)
+    
+    found_corners = None
+    if grid_corners is not None:
+        tl, tr, br, bl = grid_corners
+        left_vec = bl - tl
+        right_vec = br - tr
+        
+        tl_new = tl - left_vec * 0.20
+        tr_new = tr - right_vec * 0.20
+        bl_new = bl + left_vec * 0.05
+        br_new = br + right_vec * 0.05
+        
+        top_vec_new = tr_new - tl_new
+        bottom_vec_new = br_new - bl_new
+        
+        tl_final = tl_new - top_vec_new * 0.05
+        bl_final = bl_new - bottom_vec_new * 0.05
+        tr_final = tr_new + top_vec_new * 0.05
+        br_final = br_new + bottom_vec_new * 0.05
+        
+        h, w = img_bgr.shape[:2]
+        found_corners = np.array([
+            np.clip(tl_final, [0, 0], [w, h]),
+            np.clip(tr_final, [0, 0], [w, h]),
+            np.clip(br_final, [0, 0], [w, h]),
+            np.clip(bl_final, [0, 0], [w, h])
+        ], dtype=np.float32)
 
-    # CLAHE on luminance channel
-    gray  = cv2.cvtColor(bgr, cv2.COLOR_BGR2GRAY)
-    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
-    gray  = clahe.apply(gray)
+    if found_corners is not None:
+        img_bgr = _perspective_warp(img_bgr, found_corners)
+        
+    gray = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2GRAY)
+    
+    # 2. Perfect Lighting Flattening (Background Division)
+    kernel = np.ones((15, 15), np.uint8)
+    bg = cv2.dilate(gray, kernel, iterations=1)
+    bg = cv2.GaussianBlur(bg, (21, 21), 0)
 
-    # Unsharp mask sharpening
-    blur   = cv2.GaussianBlur(gray, (0, 0), sigmaX=1.5)
-    sharp  = cv2.addWeighted(gray, 1.5, blur, -0.5, 0)
+    gray_f = gray.astype(np.float32)
+    bg_f = bg.astype(np.float32)
+    bg_f[bg_f == 0] = 1.0 # Avoid division by zero
+    
+    diff = (gray_f / bg_f) * 255.0
+    diff = np.clip(diff, 0, 255).astype(np.uint8)
 
-    # Back to BGR so JPEG encode works normally
-    bgr_out = cv2.cvtColor(sharp, cv2.COLOR_GRAY2BGR)
+    # 3. Razor Sharp Text Binarization
+    clean_binary = cv2.adaptiveThreshold(
+        diff, 255,
+        cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+        cv2.THRESH_BINARY,
+        blockSize=21, C=15
+    )
 
-    _, buf = cv2.imencode(".jpg", bgr_out, [cv2.IMWRITE_JPEG_QUALITY, 95])
+    _, buf = cv2.imencode(".jpg", clean_binary, [cv2.IMWRITE_JPEG_QUALITY, 95])
     log.info("  Enhanced image for Gemini: %dx%d → %d bytes",
-             bgr_out.shape[1], bgr_out.shape[0], len(buf))
+             clean_binary.shape[1], clean_binary.shape[0], len(buf))
     return buf.tobytes()
 
 
@@ -1010,9 +1141,13 @@ def _process_image_to_rows(img_bytes: bytes,
 
     # ── CV + Tesseract fallback ───────────────────────────────────────────────
     log.info("  Using bounding-box Tesseract pipeline.")
-    nparr = np.frombuffer(img_bytes, np.uint8)
-    bgr   = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
-    if bgr is None:
+
+    # IMPORTANT: Always use the RAW image for Tesseract, never the enhanced
+    # image from _enhance_for_gemini(). The enhanced image has perspective-
+    # corrected geometry with completely different column positions, which
+    # breaks all column-boundary math for Tesseract.
+    bgr = _decode_image(img_bytes)
+    if bgr is None or bgr.size == 0:
         log.warning("  Could not decode image.")
         return []
 
@@ -1037,10 +1172,18 @@ def _process_image_to_rows(img_bytes: bytes,
         return []
 
     # Step 2: OCR the text section (left of attendance grid) at 2x scale
-    text_section = enhanced[:, :att_x0]
+    ts_binary = binary[:, :att_x0]
+    
+    # ERASURE OF VERTICAL LINES:
+    # Erase vertical grid lines by detecting tall lines and overwriting them with white (255)
+    inv_ts = cv2.bitwise_not(ts_binary)
+    vert_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (1, 40))
+    v_lines = cv2.morphologyEx(inv_ts, cv2.MORPH_OPEN, vert_kernel)
+    ts_clean = cv2.bitwise_or(ts_binary, v_lines)
+    
     scale = 2
-    ts_up = cv2.resize(text_section,
-                       (text_section.shape[1] * scale, text_section.shape[0] * scale),
+    ts_up = cv2.resize(ts_clean,
+                       (ts_clean.shape[1] * scale, ts_clean.shape[0] * scale),
                        interpolation=cv2.INTER_LANCZOS4)
 
     HEADER_WORDS = {"LAST", "LASTNAME", "NAME", "CHURCH", "MONTH", "YEAR",
@@ -1051,7 +1194,7 @@ def _process_image_to_rows(img_bytes: bytes,
         pil_img = PILImage.fromarray(ts_up)
         data = pytesseract.image_to_data(
             pil_img,
-            config="--psm 6 --oem 3 -c tessedit_char_whitelist="
+            config="--psm 11 --oem 3 -c tessedit_char_whitelist="
                    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz ",
             output_type=pytesseract.Output.DICT
         )
@@ -1106,8 +1249,10 @@ def _process_image_to_rows(img_bytes: bytes,
         min_bin = int(np.argmin(hist))
         return int((edges[min_bin] + edges[min_bin + 1]) / 2)
 
-    x_col1 = _gap_boundary(all_x, 0.28, 0.52, 0.42, att_x0)
-    x_col2 = _gap_boundary(all_x, 0.62, 0.90, 0.80, att_x0)
+    # First Name column usually starts between 15% and 35%
+    x_col1 = _gap_boundary(all_x, 0.15, 0.35, 0.28, att_x0)
+    # Network column usually starts between 45% and 70%
+    x_col2 = _gap_boundary(all_x, 0.45, 0.70, 0.56, att_x0)
     log.info("  Col splits: x_col1=%d x_col2=%d att_x0=%d", x_col1, x_col2, att_x0)
 
     # Step 6: assign tokens to columns, build row dicts
@@ -1133,6 +1278,44 @@ def _process_image_to_rows(img_bytes: bytes,
         combined = (last_name + " " + first_name).upper()
         if any(hw in combined for hw in ("LAST NAME", "FIRST NAME", "NETWORK")):
             continue
+
+        # Smart post-processing: extract Network if it got merged into First Name
+        network_suffixes = [
+            ("CHILDREN", "CHILDREN"),
+            ("CHILIREN", "CHILDREN"),
+            ("CHILUIREN", "CHILDREN"),
+            ("CHILOREN", "CHILDREN"),
+            ("WOMEN", "WOMEN"),
+            ("WOMIN", "WOMEN"),
+            ("WOMN", "WOMEN"),
+            ("IWOMEN", "WOMEN"),
+            ("MEN", "MEN"),
+            ("IMEN", "MEN"),
+            ("KKB", "KKB"),
+            ("YAN", "YAN")
+        ]
+        
+        # Check first_name for network suffixes
+        for suffix, actual_net in network_suffixes:
+            if first_name.endswith(" " + suffix) or first_name.endswith(suffix):
+                if not network_raw or len(network_raw) <= 2 or network_raw in ("NET", "I", "L", "A", "E", "EE", "AA", "SS"):
+                    network_raw = actual_net
+                    if first_name.endswith(" " + suffix):
+                        first_name = first_name[:-(len(suffix)+1)].strip()
+                    else:
+                        first_name = first_name[:-len(suffix)].strip()
+                break
+                
+        # Also check last_name just in case First Name was empty
+        for suffix, actual_net in network_suffixes:
+            if last_name.endswith(" " + suffix) or last_name.endswith(suffix):
+                if not network_raw or len(network_raw) <= 2 or network_raw in ("NET", "I", "L", "A", "E", "EE", "AA", "SS"):
+                    network_raw = actual_net
+                    if last_name.endswith(" " + suffix):
+                        last_name = last_name[:-(len(suffix)+1)].strip()
+                    else:
+                        last_name = last_name[:-len(suffix)].strip()
+                break
 
         network = _normalize_network(network_raw)
         if network not in ALLOWED_NETWORKS:
@@ -1189,16 +1372,16 @@ def debug_pipeline():
         return jsonify({"error": "No image provided."}), 400
 
     try:
-        nparr = np.frombuffer(image_file.read(), np.uint8)
-        bgr   = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
-        if bgr is None:
+        img_bytes = image_file.read()
+        bgr = _decode_image(img_bytes)
+        if bgr is None or bgr.size == 0:
             return jsonify({"error": "Could not decode image."}), 400
 
         bgr = _auto_orient(bgr)
         bgr = _resize(bgr)
 
         binary, gray = _camscanner_preprocess(
-            cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+            _decode_image(img_bytes)
         )
 
         horiz, vert  = _detect_grid_lines(binary)
@@ -1242,9 +1425,8 @@ def enhance():
 
     try:
         img_bytes = image_file.read()
-        nparr = np.frombuffer(img_bytes, np.uint8)
-        bgr = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
-        if bgr is None:
+        bgr = _decode_image(img_bytes)
+        if bgr is None or bgr.size == 0:
             return jsonify({"error": "Could not decode image."}), 400
 
         img_bgr = _auto_orient(bgr)

@@ -56,6 +56,20 @@
             android:configChanges="orientation|screenSize|screenLayout"
             android:screenOrientation="fullSensor" />
 
+        <!-- BatchMonthlyActivity — fullSensor -->
+        <activity
+            android:name=".BatchMonthlyActivity"
+            android:exported="false"
+            android:configChanges="orientation|screenSize|screenLayout"
+            android:screenOrientation="fullSensor" />
+
+        <!-- BatchReviewActivity — fullSensor for landscape table scrolling -->
+        <activity
+            android:name=".BatchReviewActivity"
+            android:exported="false"
+            android:configChanges="orientation|screenSize|screenLayout"
+            android:screenOrientation="fullSensor" />
+
         <!-- FileProvider for sharing exported CSV via Intent.ACTION_SEND -->
         <provider
             android:name="androidx.core.content.FileProvider"
