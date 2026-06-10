@@ -16,7 +16,7 @@ import retrofit2.converter.scalars.ScalarsConverterFactory;
 public class RetrofitClient {
 
     /** Change this to match your Flask server's IP and port. */
-    private static final String BASE_URL = "http://192.168.100.167:5000/";
+    private static final String BASE_URL = "https://ddebi-scanner-backend.hf.space/";
 
     private static Retrofit retrofit;
 
