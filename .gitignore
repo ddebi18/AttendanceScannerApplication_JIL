@@ -17,3 +17,10 @@ local.properties
 # Backend secrets
 .env
 backend/.env
+
+# IDE, build, and temporary files
+/.idea/
+*.apk
+SampleOutput/
+__pycache__/
+*.jpg

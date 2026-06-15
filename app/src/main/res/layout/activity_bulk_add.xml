@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@color/bg_dark">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@color/card_dark"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:padding="16dp"
+        android:elevation="4dp">
+
+        <ImageButton
+            android:id="@+id/btnBack"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:src="@android:drawable/ic_menu_revert"
+            app:tint="@color/text_primary" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:text="Review Scanned Members"
+            android:textColor="@color/text_primary"
+            android:textSize="18sp"
+            android:textStyle="bold" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="#33FFEB3B"
+        android:padding="12dp">
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Review and correct names. Tap a name to edit."
+            android:textColor="#FBC02D"
+            android:textSize="14sp"
+            android:gravity="center"
+            android:textStyle="bold" />
+    </LinearLayout>
+
+    <!-- Column Headers -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="32dp"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:background="@color/card_dark"
+        android:paddingStart="10dp"
+        android:paddingEnd="10dp">
+        <TextView style="@style/HeaderCell" android:layout_width="0dp" android:layout_weight="2.5" android:text="LAST NAME" />
+        <TextView style="@style/HeaderCell" android:layout_width="0dp" android:layout_weight="3"   android:text="FIRST NAME" />
+        <TextView style="@style/HeaderCell" android:layout_width="0dp" android:layout_weight="1.8" android:text="NETWORK" />
+        <View android:layout_width="30dp" android:layout_height="1dp" />
+    </LinearLayout>
+
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/rvBulkMembers"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:paddingBottom="16dp"
+        android:clipToPadding="false" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@color/card_dark"
+        android:padding="16dp"
+        android:elevation="6dp">
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnSaveToDb"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Confirm &amp; Save to DB"
+            android:textColor="@android:color/white"
+            app:backgroundTint="@color/accent_blue"
+            app:cornerRadius="8dp" />
+    </LinearLayout>
+</LinearLayout>
