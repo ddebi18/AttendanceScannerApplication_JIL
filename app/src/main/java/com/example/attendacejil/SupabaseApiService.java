@@ -23,7 +23,15 @@ public interface SupabaseApiService {
     @retrofit2.http.PATCH("members")
     Call<String> updateMember(@Query("id") String eqId, @Body RequestBody memberJson);
 
+    // Delete a member
+    @retrofit2.http.DELETE("members")
+    Call<String> deleteMember(@Query("id") String eqId);
+
     // Insert or Upsert attendance
-    @POST("attendance")
+    @POST("attendance?on_conflict=member_id,year,month")
     Call<String> addAttendanceBatch(@retrofit2.http.Header("Prefer") String prefer, @Body RequestBody attendanceArrayJson);
+
+    // Fetch attendance by year and month
+    @GET("attendance?select=*")
+    Call<String> getAttendance(@Query("year") String eqYear, @Query("month") String eqMonth);
 }

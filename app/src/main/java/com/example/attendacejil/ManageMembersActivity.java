@@ -44,11 +44,17 @@ public class ManageMembersActivity extends AppCompatActivity {
     private ActivityResultLauncher<PickVisualMediaRequest> launcherGallery;
     private android.widget.ProgressBar progressBar;
     private androidx.appcompat.widget.SearchView searchView;
+    private android.content.SharedPreferences prefs;
+    private java.util.Set<String> dismissedWarningIds;
+    private final java.util.Set<String> memberIdsWithWarnings = new java.util.HashSet<>();
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_manage_members);
+        
+        prefs = getSharedPreferences("ManageMembersPrefs", android.content.Context.MODE_PRIVATE);
+        dismissedWarningIds = new java.util.HashSet<>(prefs.getStringSet("dismissed_warnings", new java.util.HashSet<>()));
 
         rvMembers = findViewById(R.id.rvMembers);
         progressBar = findViewById(R.id.progressBar);
@@ -59,6 +65,7 @@ public class ManageMembersActivity extends AppCompatActivity {
         findViewById(R.id.btnBack).setOnClickListener(v -> finish());
         findViewById(R.id.btnSync).setOnClickListener(v -> loadMembers());
         findViewById(R.id.fabAddMember).setOnClickListener(v -> showAddMemberDialog());
+        findViewById(R.id.fabExportPdf).setOnClickListener(v -> showExportPdfDialog());
 
         searchView = findViewById(R.id.searchView);
         if (searchView != null) {
@@ -237,6 +244,27 @@ public class ManageMembersActivity extends AppCompatActivity {
                         for (int i = 0; i < arr.length(); i++) {
                             allMembersList.add(arr.getJSONObject(i));
                         }
+                        
+                        memberIdsWithWarnings.clear();
+                        for (int i = 0; i < allMembersList.size(); i++) {
+                            JSONObject m1 = allMembersList.get(i);
+                            String id1 = m1.optString("id");
+                            String fn1 = m1.optString("first_name", "").toLowerCase().trim();
+                            if (fn1.isEmpty()) continue;
+                            
+                            for (int j = i + 1; j < allMembersList.size(); j++) {
+                                JSONObject m2 = allMembersList.get(j);
+                                String id2 = m2.optString("id");
+                                String fn2 = m2.optString("first_name", "").toLowerCase().trim();
+                                if (fn2.isEmpty()) continue;
+                                
+                                int dist = NameMatcher.levenshtein(fn1, fn2);
+                                if (dist == 0 || dist == 1 || (dist == 2 && fn1.length() >= 5 && fn2.length() >= 5)) {
+                                    if (!dismissedWarningIds.contains(id1)) memberIdsWithWarnings.add(id1);
+                                    if (!dismissedWarningIds.contains(id2)) memberIdsWithWarnings.add(id2);
+                                }
+                            }
+                        }
                         // Sort alphabetically
                         allMembersList.sort((a, b) -> {
                             String nameA = a.optString("last_name", "") + a.optString("first_name", "");
@@ -256,6 +284,105 @@ public class ManageMembersActivity extends AppCompatActivity {
             public void onFailure(@NonNull Call<String> call, @NonNull Throwable t) {
                 progressBar.setVisibility(View.GONE);
                 rvMembers.setVisibility(View.VISIBLE);
+                showToast("Network error: " + t.getMessage());
+            }
+        });
+    }
+
+    private void showExportPdfDialog() {
+        java.util.Calendar cal = java.util.Calendar.getInstance();
+        new android.app.DatePickerDialog(this, (view, y, m, d) -> {
+            exportPdfForMonth(y, m);
+        }, cal.get(java.util.Calendar.YEAR), cal.get(java.util.Calendar.MONTH), 1).show();
+    }
+
+    private void exportPdfForMonth(int targetYear, int targetMonth) {
+        if (SupabaseClient.getApiService() == null) {
+            showToast("Supabase not configured.");
+            return;
+        }
+
+        int prevYear = targetYear;
+        int prevMonth = targetMonth - 1;
+        if (prevMonth < 0) {
+            prevMonth = 11;
+            prevYear--;
+        }
+
+        progressBar.setVisibility(View.VISIBLE);
+        
+        SupabaseClient.getApiService().getAttendance("eq." + prevYear, "eq." + prevMonth).enqueue(new Callback<String>() {
+            @Override
+            public void onResponse(@NonNull Call<String> call, @NonNull Response<String> response) {
+                if (response.isSuccessful() && response.body() != null) {
+                    try {
+                        JSONArray attArr = new JSONArray(response.body());
+                        List<JSONObject> validatedMembers = new ArrayList<>();
+
+                        for (JSONObject member : allMembersList) {
+                            String memberId = member.optString("id", "");
+                            boolean attended = false;
+
+                            for (int i = 0; i < attArr.length(); i++) {
+                                JSONObject attObj = attArr.getJSONObject(i);
+                                if (memberId.equals(attObj.optString("member_id", ""))) {
+                                    if (attObj.optBoolean("wk1", false) ||
+                                        attObj.optBoolean("wk2", false) ||
+                                        attObj.optBoolean("wk3", false) ||
+                                        attObj.optBoolean("wk4", false) ||
+                                        attObj.optBoolean("wk5", false)) {
+                                        attended = true;
+                                        break;
+                                    }
+                                }
+                            }
+
+                            if (attended) {
+                                validatedMembers.add(member);
+                            }
+                        }
+
+                        if (validatedMembers.isEmpty()) {
+                            progressBar.setVisibility(View.GONE);
+                            showToast("No members attended in the previous month.");
+                            return;
+                        }
+
+                        PdfGenerator.generateAttendancePdf(ManageMembersActivity.this, targetYear, targetMonth, validatedMembers, new PdfGenerator.PdfCallback() {
+                            @Override
+                            public void onSuccess(Uri fileUri) {
+                                progressBar.setVisibility(View.GONE);
+                                showToast("PDF Saved to Downloads!");
+                                Intent intent = new Intent(Intent.ACTION_VIEW);
+                                intent.setDataAndType(fileUri, "application/pdf");
+                                intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                                try {
+                                    startActivity(intent);
+                                } catch (Exception e) {
+                                    // No PDF viewer
+                                }
+                            }
+
+                            @Override
+                            public void onError(String error) {
+                                progressBar.setVisibility(View.GONE);
+                                showToast("Error generating PDF: " + error);
+                            }
+                        });
+
+                    } catch (Exception e) {
+                        progressBar.setVisibility(View.GONE);
+                        showToast("Error parsing attendance: " + e.getMessage());
+                    }
+                } else {
+                    progressBar.setVisibility(View.GONE);
+                    showToast("Failed to fetch previous month attendance: " + response.code());
+                }
+            }
+
+            @Override
+            public void onFailure(@NonNull Call<String> call, @NonNull Throwable t) {
+                progressBar.setVisibility(View.GONE);
                 showToast("Network error: " + t.getMessage());
             }
         });
@@ -425,12 +552,44 @@ public class ManageMembersActivity extends AppCompatActivity {
             } else {
                 holder.tvMemberNetwork.setText("No Network");
             }
+
+            String id = member.optString("id");
+            if (memberIdsWithWarnings.contains(id)) {
+                holder.tvDuplicateWarning.setVisibility(View.VISIBLE);
+                holder.tvDuplicateWarning.setText("⚠ Similar First Name (Tap to dismiss)");
+                holder.tvDuplicateWarning.setOnClickListener(v -> {
+                    new com.google.android.material.dialog.MaterialAlertDialogBuilder(ManageMembersActivity.this)
+                            .setTitle("Dismiss Warning")
+                            .setMessage("Hide the similar name warning for " + member.optString("first_name") + "?")
+                            .setPositiveButton("Dismiss", (dialog, which) -> {
+                                dismissedWarningIds.add(id);
+                                prefs.edit().putStringSet("dismissed_warnings", dismissedWarningIds).apply();
+                                memberIdsWithWarnings.remove(id);
+                                notifyItemChanged(position);
+                            })
+                            .setNegativeButton("Cancel", null)
+                            .show();
+                });
+            } else {
+                holder.tvDuplicateWarning.setVisibility(View.GONE);
+                holder.tvDuplicateWarning.setOnClickListener(null);
+            }
             
             holder.itemView.setOnClickListener(v -> {
                 showEditMemberDialog(member);
             });
             holder.btnEdit.setOnClickListener(v -> {
                 showEditMemberDialog(member);
+            });
+            holder.btnDelete.setOnClickListener(v -> {
+                new com.google.android.material.dialog.MaterialAlertDialogBuilder(ManageMembersActivity.this)
+                        .setTitle("Delete Member")
+                        .setMessage("Are you sure you want to delete " + name + "?")
+                        .setPositiveButton("Delete", (dialog, which) -> {
+                            deleteMemberFromDb(member.optString("id", ""));
+                        })
+                        .setNegativeButton("Cancel", null)
+                        .show();
             });
         }
 
@@ -440,14 +599,16 @@ public class ManageMembersActivity extends AppCompatActivity {
         }
 
         class MemberViewHolder extends RecyclerView.ViewHolder {
-            TextView tvMemberName, tvMemberNetwork;
-            android.widget.ImageButton btnEdit;
+            TextView tvMemberName, tvMemberNetwork, tvDuplicateWarning;
+            android.widget.ImageButton btnEdit, btnDelete;
 
             MemberViewHolder(@NonNull View itemView) {
                 super(itemView);
                 tvMemberName = itemView.findViewById(R.id.tvMemberName);
                 tvMemberNetwork = itemView.findViewById(R.id.tvMemberNetwork);
+                tvDuplicateWarning = itemView.findViewById(R.id.tvDuplicateWarning);
                 btnEdit = itemView.findViewById(R.id.btnEdit);
+                btnDelete = itemView.findViewById(R.id.btnDelete);
             }
         }
     }
@@ -534,5 +695,29 @@ public class ManageMembersActivity extends AppCompatActivity {
         } catch (Exception e) {
             showToast("Error: " + e.getMessage());
         }
+    }
+
+    private void deleteMemberFromDb(String id) {
+        if (SupabaseClient.getApiService() == null) {
+            showToast("Supabase not configured.");
+            return;
+        }
+
+        SupabaseClient.getApiService().deleteMember("eq." + id).enqueue(new Callback<String>() {
+            @Override
+            public void onResponse(@NonNull Call<String> call, @NonNull Response<String> response) {
+                if (response.isSuccessful()) {
+                    showToast("Member deleted!");
+                    loadMembers();
+                } else {
+                    showToast("Failed to delete: " + response.code());
+                }
+            }
+
+            @Override
+            public void onFailure(@NonNull Call<String> call, @NonNull Throwable t) {
+                showToast("Error deleting member: " + t.getMessage());
+            }
+        });
     }
 }

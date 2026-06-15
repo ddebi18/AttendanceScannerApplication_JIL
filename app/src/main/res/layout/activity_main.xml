@@ -20,7 +20,7 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:fillViewport="true"
-        android:paddingBottom="170dp"
+        android:paddingBottom="280dp"
         android:clipToPadding="false">
 
         <LinearLayout
@@ -372,177 +372,201 @@
                 </LinearLayout>
             </androidx.cardview.widget.CardView>
 
-            <!-- ══ BATCH SCAN CARD ════════════════════════════════════════════ -->
-            <androidx.cardview.widget.CardView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="12dp"
-                android:layout_marginEnd="12dp"
-                android:layout_marginTop="12dp"
-                app:cardBackgroundColor="@color/card_dark"
-                app:cardCornerRadius="12dp"
-                app:cardElevation="3dp">
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="vertical"
-                    android:padding="16dp">
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="ADVANCED"
-                        android:textColor="@color/text_secondary"
-                        android:textSize="10sp"
-                        android:textAllCaps="true"
-                        android:letterSpacing="0.12"
-                        android:layout_marginBottom="8dp" />
-
-                    <com.google.android.material.button.MaterialButton
-                        android:id="@+id/btnBatchScan"
-                        style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-                        android:layout_width="match_parent"
-                        android:layout_height="56dp"
-                        android:text="Batch Monthly Scan"
-                        android:textColor="@color/accent_blue"
-                        app:strokeColor="@color/accent_blue"
-                        app:cornerRadius="12dp" />
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Scan all 8 sheets at once and export multiple CSVs"
-                        android:textColor="@color/text_secondary"
-                        android:textSize="12sp"
-                        android:layout_gravity="center_horizontal"
-                        android:layout_marginTop="6dp" />
-
-                </LinearLayout>
-            </androidx.cardview.widget.CardView>
-
-
         </LinearLayout>
     </androidx.core.widget.NestedScrollView>
 
 
-    <!-- ══ BOTTOM ACTION BUTTONS (centered) ═══════════════════════════════════ -->
+    <!-- ══ BOTTOM ACTION BUTTONS (2-Row Grid) ═════════════════════════════════ -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_gravity="bottom|center_horizontal"
+        android:layout_gravity="bottom"
         android:background="@color/card_dark"
-        android:orientation="horizontal"
-        android:gravity="center"
-        android:paddingStart="24dp"
-        android:paddingEnd="24dp"
-        android:paddingTop="12dp"
-        android:paddingBottom="16dp"
+        android:orientation="vertical"
         android:elevation="12dp"
-        android:weightSum="3"
-        android:baselineAligned="false">
+        android:paddingTop="16dp"
+        android:paddingBottom="16dp">
 
-        <!-- Gallery button -->
-        <LinearLayout
-            android:id="@+id/fabGalleryContainer"
-            android:layout_width="0dp"
+        <!-- MAIN SCANNING -->
+        <TextView
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:orientation="vertical"
-            android:gravity="center"
-            android:padding="12dp"
-            android:background="?attr/selectableItemBackgroundBorderless"
-            android:layout_marginEnd="8dp">
+            android:text="MAIN SCANNING"
+            android:textColor="@color/text_secondary"
+            android:textSize="10sp"
+            android:textAllCaps="true"
+            android:letterSpacing="0.12"
+            android:layout_marginStart="24dp"
+            android:layout_marginBottom="8dp"/>
 
-            <com.google.android.material.floatingactionbutton.FloatingActionButton
-                android:id="@+id/fabGallery"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:contentDescription="Choose from Gallery"
-                android:src="@android:drawable/ic_menu_gallery"
-                app:backgroundTint="@color/accent_blue"
-                app:tint="@android:color/white"
-                app:fabSize="normal"
-                app:elevation="6dp" />
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:text="Scan from Gallery"
-                android:textColor="@color/text_primary"
-                android:textSize="12sp"
-                android:textStyle="bold"
-                android:gravity="center" />
-        </LinearLayout>
-
-        <!-- Enhance / multi-image button -->
         <LinearLayout
-            android:id="@+id/fabEnhanceContainer"
-            android:layout_width="0dp"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:orientation="vertical"
+            android:orientation="horizontal"
             android:gravity="center"
-            android:padding="12dp"
-            android:background="?attr/selectableItemBackgroundBorderless"
-            android:layout_marginStart="8dp">
-
-            <com.google.android.material.floatingactionbutton.FloatingActionButton
-                android:id="@+id/fabEnhance"
-                android:layout_width="wrap_content"
+            android:baselineAligned="false"
+            android:paddingStart="24dp"
+            android:paddingEnd="24dp">
+            
+            <!-- Scan Single Week -->
+            <LinearLayout
+                android:id="@+id/fabGalleryContainer"
+                android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:contentDescription="Enhance source image"
-                android:src="@android:drawable/ic_menu_slideshow"
-                app:backgroundTint="#FFFF9800"
-                app:tint="@android:color/white"
-                app:fabSize="normal"
-                app:elevation="6dp" />
+                android:layout_weight="1"
+                android:orientation="vertical"
+                android:gravity="center"
+                android:padding="8dp"
+                android:background="?attr/selectableItemBackgroundBorderless">
 
-            <TextView
-                android:layout_width="wrap_content"
+                <com.google.android.material.floatingactionbutton.FloatingActionButton
+                    android:id="@+id/fabGallery"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:src="@android:drawable/ic_menu_gallery"
+                    app:backgroundTint="@color/accent_blue"
+                    app:tint="@android:color/white"
+                    app:fabSize="normal"
+                    app:elevation="6dp" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:text="Single Week"
+                    android:textColor="@color/text_primary"
+                    android:textSize="12sp"
+                    android:textStyle="bold"
+                    android:gravity="center" />
+            </LinearLayout>
+
+            <!-- Batch Monthly Scan -->
+            <LinearLayout
+                android:id="@+id/fabBatchScanContainer"
+                android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:text="Enhance Source Image"
-                android:textColor="@color/text_primary"
-                android:textSize="12sp"
-                android:textStyle="bold"
-                android:gravity="center" />
+                android:layout_weight="1"
+                android:orientation="vertical"
+                android:gravity="center"
+                android:padding="8dp"
+                android:background="?attr/selectableItemBackgroundBorderless">
+
+                <com.google.android.material.floatingactionbutton.FloatingActionButton
+                    android:id="@+id/btnBatchScan"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:src="@android:drawable/ic_menu_agenda"
+                    app:backgroundTint="@color/accent_blue"
+                    app:tint="@android:color/white"
+                    app:fabSize="normal"
+                    app:elevation="6dp" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:text="Batch Monthly"
+                    android:textColor="@color/text_primary"
+                    android:textSize="12sp"
+                    android:textStyle="bold"
+                    android:gravity="center" />
+            </LinearLayout>
         </LinearLayout>
-        <!-- Manage Members button -->
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="#FF2A2A3D"
+            android:layout_marginTop="12dp"
+            android:layout_marginBottom="12dp"
+            android:layout_marginStart="24dp"
+            android:layout_marginEnd="24dp"/>
+
+        <!-- UTILITIES -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="UTILITIES"
+            android:textColor="@color/text_secondary"
+            android:textSize="10sp"
+            android:textAllCaps="true"
+            android:letterSpacing="0.12"
+            android:layout_marginStart="24dp"
+            android:layout_marginBottom="8dp"/>
+
         <LinearLayout
-            android:id="@+id/fabManageMembersContainer"
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_weight="1"
-            android:orientation="vertical"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
             android:gravity="center"
-            android:padding="8dp"
-            android:background="?attr/selectableItemBackgroundBorderless"
-            android:layout_marginStart="4dp">
+            android:baselineAligned="false"
+            android:paddingStart="24dp"
+            android:paddingEnd="24dp">
 
-            <com.google.android.material.floatingactionbutton.FloatingActionButton
-                android:id="@+id/fabManageMembers"
-                android:layout_width="wrap_content"
+            <!-- Enhance Image -->
+            <LinearLayout
+                android:id="@+id/fabEnhanceContainer"
+                android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:contentDescription="Manage Members"
-                android:src="@android:drawable/ic_menu_myplaces"
-                app:backgroundTint="#4CAF50"
-                app:tint="@android:color/white"
-                app:fabSize="normal"
-                app:elevation="6dp" />
+                android:layout_weight="1"
+                android:orientation="vertical"
+                android:gravity="center"
+                android:padding="8dp"
+                android:background="?attr/selectableItemBackgroundBorderless">
 
-            <TextView
-                android:layout_width="wrap_content"
+                <com.google.android.material.floatingactionbutton.FloatingActionButton
+                    android:id="@+id/fabEnhance"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:src="@android:drawable/ic_menu_slideshow"
+                    app:backgroundTint="#FFFF9800"
+                    app:tint="@android:color/white"
+                    app:fabSize="normal"
+                    app:elevation="6dp" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:text="Enhance Image"
+                    android:textColor="@color/text_primary"
+                    android:textSize="12sp"
+                    android:textStyle="bold"
+                    android:gravity="center" />
+            </LinearLayout>
+
+            <!-- Manage Members -->
+            <LinearLayout
+                android:id="@+id/fabManageMembersContainer"
+                android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:text="Manage\nMembers"
-                android:textColor="@color/text_primary"
-                android:textSize="12sp"
-                android:textStyle="bold"
-                android:gravity="center" />
+                android:layout_weight="1"
+                android:orientation="vertical"
+                android:gravity="center"
+                android:padding="8dp"
+                android:background="?attr/selectableItemBackgroundBorderless">
+
+                <com.google.android.material.floatingactionbutton.FloatingActionButton
+                    android:id="@+id/fabManageMembers"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:src="@android:drawable/ic_menu_myplaces"
+                    app:backgroundTint="#4CAF50"
+                    app:tint="@android:color/white"
+                    app:fabSize="normal"
+                    app:elevation="6dp" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:text="Manage Members"
+                    android:textColor="@color/text_primary"
+                    android:textSize="12sp"
+                    android:textStyle="bold"
+                    android:gravity="center" />
+            </LinearLayout>
         </LinearLayout>
-
     </LinearLayout>
 
 </androidx.coordinatorlayout.widget.CoordinatorLayout>

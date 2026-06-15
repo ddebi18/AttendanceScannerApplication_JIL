@@ -2,6 +2,7 @@ package com.example.attendacejil;
 
 import android.os.Bundle;
 import android.view.LayoutInflater;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
@@ -130,6 +131,10 @@ public class ReviewFragment extends Fragment implements ReviewAdapter.OnDataChan
         } catch (Exception e) {
             // Ignore
         }
+    }
+
+    public void saveState() {
+        onSaveInstanceState(new Bundle());
     }
 
     @Nullable
@@ -268,9 +273,17 @@ public class ReviewFragment extends Fragment implements ReviewAdapter.OnDataChan
                     fragmentDataChangedListener.onFragmentDataChanged();
                 }
             }
+
+            @Override
+            public void onAttendanceToggledGlobally(String id, int colIdx, boolean isPresent) {
+                if (getActivity() instanceof BatchReviewActivity) {
+                    ((BatchReviewActivity) getActivity()).onAttendanceToggledGlobally(id, colIdx, isPresent);
+                }
+            }
         });
         recyclerView.setLayoutManager(new LinearLayoutManager(requireContext()));
         recyclerView.setAdapter(adapter);
+        recyclerView.addOnItemTouchListener(new DragSelectTouchListener());
 
         AlphabetIndexScroller scroller = v.findViewById(R.id.alphabetScroller);
         if (scroller != null) {
@@ -445,6 +458,117 @@ public class ReviewFragment extends Fragment implements ReviewAdapter.OnDataChan
                 
                 filterRows(currentQuery);
                 break;
+            }
+        }
+    }
+
+    public void updateAttendanceGlobally(String id, int colIdx, boolean isPresent) {
+        if (allRows == null) return;
+        for (int i = 0; i < allRows.size(); i++) {
+            AttendanceRow r = allRows.get(i);
+            if (r.id != null && r.id.equals(id)) {
+                r.attendance[colIdx] = isPresent;
+                if (colIdx == selectedColumn() && adapter != null) {
+                    for (int j = 0; j < rows.size(); j++) {
+                        if (rows.get(j).id.equals(id)) {
+                            adapter.notifyItemChanged(j);
+                            break;
+                        }
+                    }
+                }
+                saveState();
+                break;
+            }
+        }
+    }
+
+    private class DragSelectTouchListener implements RecyclerView.OnItemTouchListener {
+        private boolean isActive = false;
+        private boolean isChecking = true;
+        private int lastToggledPos = -1;
+
+        private int dpToPx(int dp) {
+            return (int) (dp * getResources().getDisplayMetrics().density);
+        }
+
+        @Override
+        public boolean onInterceptTouchEvent(@NonNull RecyclerView rv, @NonNull MotionEvent e) {
+            if (e.getAction() == MotionEvent.ACTION_DOWN) {
+                View child = rv.findChildViewUnder(e.getX(), e.getY());
+                if (child != null) {
+                    float x = e.getX();
+                    int pos = rv.getChildAdapterPosition(child);
+                    if (pos != RecyclerView.NO_POSITION) {
+                        // Find the visible checkbox to determine the exact dynamic touch area
+                        View cb = child.findViewById(R.id.cbAtt0);
+                        if (cb.getVisibility() != View.VISIBLE) cb = child.findViewById(R.id.cbAtt1);
+                        if (cb.getVisibility() != View.VISIBLE) cb = child.findViewById(R.id.cbAtt2);
+                        if (cb.getVisibility() != View.VISIBLE) cb = child.findViewById(R.id.cbAtt3);
+                        if (cb.getVisibility() != View.VISIBLE) cb = child.findViewById(R.id.cbAtt4);
+                        if (cb.getVisibility() != View.VISIBLE) cb = child.findViewById(R.id.cbAtt5);
+                        if (cb.getVisibility() != View.VISIBLE) cb = child.findViewById(R.id.cbAtt6);
+                        if (cb.getVisibility() != View.VISIBLE) cb = child.findViewById(R.id.cbAtt7);
+                        if (cb.getVisibility() != View.VISIBLE) cb = child.findViewById(R.id.cbAtt8);
+                        if (cb.getVisibility() != View.VISIBLE) cb = child.findViewById(R.id.cbAtt9);
+
+                        // getLeft() is relative to the parent LinearLayout (child)
+                        if (cb != null && cb.getVisibility() == View.VISIBLE && x >= cb.getLeft() && x <= cb.getRight()) {
+                            isActive = true;
+                            AttendanceRow row = rows.get(pos);
+                            // Toggle based on the first item clicked
+                            isChecking = !row.attendance[selectedColumn()];
+                            toggleRow(pos);
+                            lastToggledPos = pos;
+                            return true; // Steal the touch events to handle drag
+                        }
+                    }
+                }
+            }
+            return false;
+        }
+
+        @Override
+        public void onTouchEvent(@NonNull RecyclerView rv, @NonNull MotionEvent e) {
+            if (!isActive) return;
+
+            if (e.getAction() == MotionEvent.ACTION_MOVE) {
+                View child = rv.findChildViewUnder(e.getX(), e.getY());
+                if (child != null) {
+                    int pos = rv.getChildAdapterPosition(child);
+                    if (pos != RecyclerView.NO_POSITION && pos != lastToggledPos) {
+                        AttendanceRow row = rows.get(pos);
+                        if (row.attendance[selectedColumn()] != isChecking) {
+                            toggleRow(pos);
+                        }
+                        lastToggledPos = pos;
+                    }
+                }
+                // Auto-scroll if near edges
+                if (e.getY() > rv.getHeight() - dpToPx(50)) {
+                    rv.scrollBy(0, dpToPx(15));
+                } else if (e.getY() < dpToPx(50)) {
+                    rv.scrollBy(0, -dpToPx(15));
+                }
+            } else if (e.getAction() == MotionEvent.ACTION_UP || e.getAction() == MotionEvent.ACTION_CANCEL) {
+                isActive = false;
+                lastToggledPos = -1;
+            }
+        }
+
+        @Override
+        public void onRequestDisallowInterceptTouchEvent(boolean disallowIntercept) {}
+
+        private void toggleRow(int pos) {
+            if (pos >= 0 && pos < rows.size()) {
+                AttendanceRow row = rows.get(pos);
+                if (row.markedForDeletion) return;
+                row.attendance[selectedColumn()] = isChecking;
+                adapter.notifyItemChanged(pos);
+                onDataChanged();
+                if (getActivity() instanceof BatchReviewActivity) {
+                    ((BatchReviewActivity) getActivity()).onAttendanceToggledGlobally(row.id, selectedColumn(), isChecking);
+                }
+                saveState();
             }
         }
     }

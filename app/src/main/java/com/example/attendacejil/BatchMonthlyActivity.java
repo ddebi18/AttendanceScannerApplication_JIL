@@ -129,10 +129,24 @@ public class BatchMonthlyActivity extends AppCompatActivity {
     }
 
     private void setupMonthDisplay() {
+        android.content.SharedPreferences prefs = getSharedPreferences("AttendancePrefs", MODE_PRIVATE);
+        int savedYear = prefs.getInt("last_batch_year", -1);
+        int savedMonth = prefs.getInt("last_batch_month", -1);
+        
+        if (savedYear != -1 && savedMonth != -1) {
+            selectedCalendar.set(java.util.Calendar.YEAR, savedYear);
+            selectedCalendar.set(java.util.Calendar.MONTH, savedMonth);
+        }
+
         Runnable updateText = () -> {
             String month = new SimpleDateFormat("MMMM yyyy", Locale.getDefault())
                     .format(selectedCalendar.getTime()).toUpperCase(Locale.getDefault());
             tvBatchMonth.setText(month);
+            
+            prefs.edit()
+                 .putInt("last_batch_year", selectedCalendar.get(java.util.Calendar.YEAR))
+                 .putInt("last_batch_month", selectedCalendar.get(java.util.Calendar.MONTH))
+                 .apply();
         };
         updateText.run();
 

@@ -37,6 +37,16 @@
                 android:layout_marginTop="4dp"
                 android:textColor="@color/text_secondary"
                 android:textSize="14sp" />
+
+            <TextView
+                android:id="@+id/tvDuplicateWarning"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:text="⚠ Duplicate First Name"
+                android:textColor="#FFFF9800"
+                android:textSize="12sp"
+                android:visibility="gone" />
         </LinearLayout>
 
         <ImageButton
@@ -49,6 +59,17 @@
             android:padding="12dp"
             android:contentDescription="Edit member"
             android:alpha="0.7" />
+
+        <ImageButton
+            android:id="@+id/btnDelete"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:src="@android:drawable/ic_menu_delete"
+            app:tint="#E53935"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:padding="12dp"
+            android:contentDescription="Delete member"
+            android:alpha="0.8" />
 
     </LinearLayout>
 </androidx.cardview.widget.CardView>

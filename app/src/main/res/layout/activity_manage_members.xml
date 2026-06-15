@@ -88,6 +88,17 @@
     </LinearLayout>
 
     <com.google.android.material.floatingactionbutton.FloatingActionButton
+        android:id="@+id/fabExportPdf"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|end"
+        android:layout_marginEnd="24dp"
+        android:layout_marginBottom="96dp"
+        android:src="@android:drawable/ic_menu_save"
+        app:backgroundTint="@color/card_dark"
+        app:tint="@color/accent_blue" />
+
+    <com.google.android.material.floatingactionbutton.FloatingActionButton
         android:id="@+id/fabAddMember"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"

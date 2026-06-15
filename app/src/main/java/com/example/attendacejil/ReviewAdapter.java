@@ -42,6 +42,7 @@ public class ReviewAdapter extends RecyclerView.Adapter<ReviewAdapter.RowViewHol
     public interface OnRowEditedListener {
         void onRowEditedGlobally(String id, String newLastName, String newFirstName, String newNetwork);
         void onRowAddedGlobally(String id, String lastName, String firstName, String network);
+        void onAttendanceToggledGlobally(String id, int colIdx, boolean isPresent);
     }
 
     private final Context              context;
@@ -126,6 +127,9 @@ public class ReviewAdapter extends RecyclerView.Adapter<ReviewAdapter.RowViewHol
                 row.attendance[idx] = !row.attendance[idx];
                 notifyItemChanged(h.getAdapterPosition());
                 listener.onDataChanged();
+                if (rowEditedListener != null) {
+                    rowEditedListener.onAttendanceToggledGlobally(row.id, idx, row.attendance[idx]);
+                }
             });
         }
 

@@ -177,6 +177,15 @@ public class BatchReviewActivity extends AppCompatActivity {
         }
     }
 
+    public void onAttendanceToggledGlobally(String id, int colIdx, boolean isPresent) {
+        for (int i = 0; i < 10; i++) {
+            ReviewFragment frag = adapter.getFragment(i);
+            if (frag != null) {
+                frag.updateAttendanceGlobally(id, colIdx, isPresent);
+            }
+        }
+    }
+
     public void onRowAddedGlobally(String id, String lastName, String firstName, String network) {
         for (int i = 0; i < 10; i++) {
             ReviewFragment frag = adapter.getFragment(i);

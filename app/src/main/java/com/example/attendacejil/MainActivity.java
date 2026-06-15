@@ -92,6 +92,14 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
+        android.content.SharedPreferences prefs = getSharedPreferences("AttendancePrefs", MODE_PRIVATE);
+        int savedYear = prefs.getInt("last_batch_year", -1);
+        int savedMonth = prefs.getInt("last_batch_month", -1);
+        if (savedYear != -1 && savedMonth != -1) {
+            selectedCalendar.set(java.util.Calendar.YEAR, savedYear);
+            selectedCalendar.set(java.util.Calendar.MONTH, savedMonth);
+        }
+
         bindViews();
         setupCameraLauncher();
         setupGalleryLauncher();
@@ -123,6 +131,10 @@ public class MainActivity extends AppCompatActivity {
         fabEnhance        = findViewById(R.id.fabEnhance);
         fabManageMembers  = findViewById(R.id.fabManageMembers);
 
+        findViewById(R.id.fabBatchScanContainer).setOnClickListener(v -> {
+            Intent intent = new Intent(this, BatchMonthlyActivity.class);
+            startActivity(intent);
+        });
         findViewById(R.id.btnBatchScan).setOnClickListener(v -> {
             Intent intent = new Intent(this, BatchMonthlyActivity.class);
             startActivity(intent);
@@ -134,6 +146,12 @@ public class MainActivity extends AppCompatActivity {
             new android.app.DatePickerDialog(this, (view, y, m, d) -> {
                 selectedCalendar.set(java.util.Calendar.YEAR, y);
                 selectedCalendar.set(java.util.Calendar.MONTH, m);
+                
+                getSharedPreferences("AttendancePrefs", MODE_PRIVATE).edit()
+                     .putInt("last_batch_year", y)
+                     .putInt("last_batch_month", m)
+                     .apply();
+
                 updateSundayButtonStates();
                 updateSessionCard();
                 refreshChipsAndFab();
