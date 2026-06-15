@@ -42,9 +42,11 @@ public class BatchMonthlyActivity extends AppCompatActivity {
 
     private final List<Uri> selectedImages = new ArrayList<>();
     private BatchImageAdapter imageAdapter;
+    private final List<NameMatcher.DbMember> cachedDbMembers = new ArrayList<>();
 
     private TextView tvBatchMonth, tvImageCount;
-    private Button btnAddImages, btnScanAll;
+    private Button btnAddImages, btnScanAll, btnResumeBatch;
+    private android.widget.CheckBox cbWk1, cbWk2, cbWk3, cbWk4, cbWk5;
     private RecyclerView rvImages;
 
     private ActivityResultLauncher<Intent> galleryLauncher;
@@ -63,6 +65,53 @@ public class BatchMonthlyActivity extends AppCompatActivity {
         findViewById(R.id.btnBack).setOnClickListener(v -> finish());
         btnAddImages.setOnClickListener(v -> openGallery());
         btnScanAll.setOnClickListener(v -> scanAllImages());
+        
+        checkResumeProgress();
+    }
+
+    private void checkResumeProgress() {
+        File tmp = new File(getCacheDir(), "batch_master_data.json");
+        boolean isValid = false;
+        if (tmp.exists()) {
+            try {
+                java.io.BufferedReader br = new java.io.BufferedReader(new java.io.FileReader(tmp));
+                StringBuilder sb = new StringBuilder();
+                String line;
+                while ((line = br.readLine()) != null) sb.append(line);
+                br.close();
+                org.json.JSONArray arr = new org.json.JSONArray(sb.toString());
+                if (arr.length() > 0) {
+                    isValid = true;
+                }
+            } catch (Exception e) {
+                // Invalid JSON
+            }
+        }
+
+        if (isValid) {
+            btnResumeBatch.setVisibility(View.VISIBLE);
+            btnResumeBatch.setOnClickListener(v -> {
+                Intent intent = new Intent(this, BatchReviewActivity.class);
+                intent.putExtra("json_file_path", tmp.getAbsolutePath());
+                intent.putExtra(ReviewActivity.EXTRA_YEAR, selectedCalendar.get(java.util.Calendar.YEAR));
+                intent.putExtra(ReviewActivity.EXTRA_MONTH, selectedCalendar.get(java.util.Calendar.MONTH));
+                
+                boolean[] disabledWeeks = {
+                    !cbWk1.isChecked(), !cbWk2.isChecked(), !cbWk3.isChecked(), !cbWk4.isChecked(), !cbWk5.isChecked()
+                };
+                intent.putExtra("disabled_weeks", disabledWeeks);
+                
+                startActivity(intent);
+            });
+        } else {
+            if (tmp.exists()) {
+                tmp.delete(); // Clean up invalid/empty file
+            }
+            btnResumeBatch.setVisibility(View.GONE);
+            btnResumeBatch.setOnClickListener(v -> {
+                showToast("No previous session found.");
+            });
+        }
     }
 
     private void bindViews() {
@@ -70,6 +119,12 @@ public class BatchMonthlyActivity extends AppCompatActivity {
         tvImageCount = findViewById(R.id.tvImageCount);
         btnAddImages = findViewById(R.id.btnAddImages);
         btnScanAll = findViewById(R.id.btnScanAll);
+        btnResumeBatch = findViewById(R.id.btnResumeBatch);
+        cbWk1 = findViewById(R.id.cbWk1);
+        cbWk2 = findViewById(R.id.cbWk2);
+        cbWk3 = findViewById(R.id.cbWk3);
+        cbWk4 = findViewById(R.id.cbWk4);
+        cbWk5 = findViewById(R.id.cbWk5);
         rvImages = findViewById(R.id.rvImages);
     }
 
@@ -166,14 +221,48 @@ public class BatchMonthlyActivity extends AppCompatActivity {
         // Accumulate all JSON rows here
         JSONArray allMergedRows = new JSONArray();
         int[] index = {0};
+        ArrayList<String> imageLabels = new ArrayList<>();
 
-        processNextSlot(index, allMergedRows, batchDialog,
-                progressBar, tvCounter, tvPercent, tvStatus);
+        fetchDbMembers(() -> processNextSlot(index, allMergedRows, imageLabels, batchDialog,
+                progressBar, tvCounter, tvPercent, tvStatus));
+    }
+
+    private void fetchDbMembers(Runnable onLoaded) {
+        if (SupabaseClient.getApiService() == null) {
+            onLoaded.run();
+            return;
+        }
+        SupabaseClient.getApiService().getMembers().enqueue(new Callback<String>() {
+            @Override
+            public void onResponse(@NonNull Call<String> call, @NonNull Response<String> response) {
+                cachedDbMembers.clear();
+                if (response.isSuccessful() && response.body() != null) {
+                    try {
+                        JSONArray arr = new JSONArray(response.body());
+                        for (int i = 0; i < arr.length(); i++) {
+                            JSONObject obj = arr.getJSONObject(i);
+                            String id = obj.optString("id", "");
+                            String f = obj.optString("first_name", "");
+                            String l = obj.optString("last_name", "");
+                            String n = obj.optString("network_name", "");
+                            cachedDbMembers.add(new NameMatcher.DbMember(id, f, l, n));
+                        }
+                    } catch (Exception e) {}
+                }
+                onLoaded.run();
+            }
+
+            @Override
+            public void onFailure(@NonNull Call<String> call, @NonNull Throwable t) {
+                onLoaded.run();
+            }
+        });
     }
 
     private void processNextSlot(
             int[] index,
             JSONArray allMergedRows,
+            ArrayList<String> imageLabels,
             Dialog batchDialog,
             com.google.android.material.progressindicator.LinearProgressIndicator progressBar,
             TextView tvCounter,
@@ -185,7 +274,7 @@ public class BatchMonthlyActivity extends AppCompatActivity {
         if (index[0] >= total) {
             batchDialog.dismiss();
             getWindow().clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
-            openBatchReview(allMergedRows);
+            openBatchReview(allMergedRows, imageLabels);
             return;
         }
 
@@ -203,8 +292,9 @@ public class BatchMonthlyActivity extends AppCompatActivity {
         try {
             File tmp = uriToTempFile(uri, index[0]);
             if (tmp == null) {
+                imageLabels.add("Page " + current);
                 index[0]++;
-                processNextSlot(index, allMergedRows, batchDialog,
+                processNextSlot(index, allMergedRows, imageLabels, batchDialog,
                         progressBar, tvCounter, tvPercent, tvStatus);
                 return;
             }
@@ -229,18 +319,40 @@ public class BatchMonthlyActivity extends AppCompatActivity {
                                     JSONObject obj = new JSONObject(jsonStr);
                                     JSONArray rows = obj.optJSONArray("rows");
                                     if (rows != null) {
+                                        // Compute per-image alphabetical label
+                                        String firstLetter = null, lastLetter = null;
                                         for (int i = 0; i < rows.length(); i++) {
-                                            allMergedRows.put(rows.getJSONObject(i));
+                                            JSONObject row = rows.getJSONObject(i);
+                                            row.put("id", java.util.UUID.randomUUID().toString());
+                                            org.json.JSONArray emptyAtt = new org.json.JSONArray();
+                                            for (int j = 0; j < 10; j++) emptyAtt.put(false);
+                                            row.put("attendance", emptyAtt);
+                                            allMergedRows.put(row);
+                                            String ln = row.optString("last_name", "").trim().toUpperCase();
+                                            if (!ln.isEmpty()) {
+                                                String letter = String.valueOf(ln.charAt(0));
+                                                if (firstLetter == null || letter.compareTo(firstLetter) < 0) firstLetter = letter;
+                                                if (lastLetter == null || letter.compareTo(lastLetter) > 0) lastLetter = letter;
+                                            }
                                         }
+                                        String label = firstLetter != null
+                                                ? (firstLetter.equals(lastLetter) ? firstLetter : firstLetter + " - " + lastLetter)
+                                                : "Page " + current;
+                                        imageLabels.add(label);
+                                    } else {
+                                        imageLabels.add("Page " + current);
                                     }
                                 } catch (Exception e) {
+                                    imageLabels.add("Page " + current);
                                     showToast("Parse error on Page " + current);
                                 }
+                            } else {
+                                imageLabels.add("Page " + current);
                             }
                             //noinspection ResultOfMethodCallIgnored
                             tmp.delete();
                             index[0]++;
-                            processNextSlot(index, allMergedRows, batchDialog,
+                            processNextSlot(index, allMergedRows, imageLabels, batchDialog,
                                     progressBar, tvCounter, tvPercent, tvStatus);
                         }
 
@@ -248,18 +360,20 @@ public class BatchMonthlyActivity extends AppCompatActivity {
                         public void onFailure(@NonNull Call<ResponseBody> call,
                                               @NonNull Throwable t) {
                             showToast("Error on Page " + current + ": " + t.getMessage());
+                            imageLabels.add("Page " + current);
                             //noinspection ResultOfMethodCallIgnored
                             tmp.delete();
                             index[0]++;
-                            processNextSlot(index, allMergedRows, batchDialog,
+                            processNextSlot(index, allMergedRows, imageLabels, batchDialog,
                                     progressBar, tvCounter, tvPercent, tvStatus);
                         }
                     });
 
         } catch (Exception e) {
             showToast("Error reading image for Page " + current);
+            imageLabels.add("Page " + current);
             index[0]++;
-            processNextSlot(index, allMergedRows, batchDialog,
+            processNextSlot(index, allMergedRows, imageLabels, batchDialog,
                     progressBar, tvCounter, tvPercent, tvStatus);
         }
     }
@@ -280,7 +394,7 @@ public class BatchMonthlyActivity extends AppCompatActivity {
         }
     }
 
-    private void openBatchReview(JSONArray allMergedRows) {
+    private void openBatchReview(JSONArray allMergedRows, ArrayList<String> imageLabels) {
         if (allMergedRows.length() == 0) {
             showToast("No attendance data found in the scanned pages.");
             return;
@@ -318,6 +432,8 @@ public class BatchMonthlyActivity extends AppCompatActivity {
             merged.put(r);
         }
 
+        NameMatcher.autoCorrectNames(merged, cachedDbMembers);
+
         try {
             java.io.File tmp = new java.io.File(getCacheDir(), "batch_master_data.json");
             java.io.FileWriter fw = new java.io.FileWriter(tmp);
@@ -328,6 +444,19 @@ public class BatchMonthlyActivity extends AppCompatActivity {
             intent.putExtra("json_file_path", tmp.getAbsolutePath());
             intent.putExtra(ReviewActivity.EXTRA_YEAR, selectedCalendar.get(java.util.Calendar.YEAR));
             intent.putExtra(ReviewActivity.EXTRA_MONTH, selectedCalendar.get(java.util.Calendar.MONTH));
+            
+            boolean[] disabledWeeks = {
+                !cbWk1.isChecked(), !cbWk2.isChecked(), !cbWk3.isChecked(), !cbWk4.isChecked(), !cbWk5.isChecked()
+            };
+            intent.putExtra("disabled_weeks", disabledWeeks);
+            
+            ArrayList<String> uriStrings = new ArrayList<>();
+            for (Uri uri : selectedImages) {
+                uriStrings.add(uri.toString());
+            }
+            intent.putStringArrayListExtra(ImageViewerActivity.EXTRA_IMAGE_URIS, uriStrings);
+            intent.putStringArrayListExtra(ImageViewerActivity.EXTRA_IMAGE_LABELS, imageLabels);
+            
             startActivity(intent);
         } catch (Exception e) {
             showToast("Error saving temp data.");

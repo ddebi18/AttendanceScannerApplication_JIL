@@ -73,7 +73,7 @@ public class MainActivity extends AppCompatActivity {
     private TextView       tvSessionMonth, tvSessionWeek;
     private TextView       tvSelectedSunday, tvSelectedService;
     private TextView       tvSelectionHint;
-    private FloatingActionButton fabCamera, fabGallery, fabEnhance;
+    private FloatingActionButton fabGallery, fabEnhance, fabManageMembers;
 
     private Button[] sundayBtns;   // index 0–4
 
@@ -82,6 +82,8 @@ public class MainActivity extends AppCompatActivity {
     private ActivityResultLauncher<Intent> galleryLauncher;
     private ActivityResultLauncher<Intent> enhanceCameraLauncher;
     private ActivityResultLauncher<Intent> enhanceGalleryLauncher;
+
+    private final java.util.List<NameMatcher.DbMember> cachedDbMembers = new java.util.ArrayList<>();
 
     // ─── Lifecycle ────────────────────────────────────────────────────────────
 
@@ -101,6 +103,12 @@ public class MainActivity extends AppCompatActivity {
         refreshChipsAndFab();
     }
 
+    @Override
+    protected void onResume() {
+        super.onResume();
+        SupabaseClient.init(this);
+    }
+
     // ── View binding ──────────────────────────────────────────────────────────
 
     private void bindViews() {
@@ -111,19 +119,22 @@ public class MainActivity extends AppCompatActivity {
         tvSelectedSunday  = findViewById(R.id.tvSelectedSunday);
         tvSelectedService = findViewById(R.id.tvSelectedService);
         tvSelectionHint   = findViewById(R.id.tvSelectionHint);
-        fabCamera         = findViewById(R.id.fabCamera);
         fabGallery        = findViewById(R.id.fabGallery);
         fabEnhance        = findViewById(R.id.fabEnhance);
+        fabManageMembers  = findViewById(R.id.fabManageMembers);
 
         findViewById(R.id.btnBatchScan).setOnClickListener(v -> {
             Intent intent = new Intent(this, BatchMonthlyActivity.class);
             startActivity(intent);
         });
 
+        fabManageMembers.setOnClickListener(v -> openManageMembers());
+
         tvSessionMonth.setOnClickListener(v -> {
             new android.app.DatePickerDialog(this, (view, y, m, d) -> {
                 selectedCalendar.set(java.util.Calendar.YEAR, y);
                 selectedCalendar.set(java.util.Calendar.MONTH, m);
+                updateSundayButtonStates();
                 updateSessionCard();
                 refreshChipsAndFab();
             }, selectedCalendar.get(java.util.Calendar.YEAR), selectedCalendar.get(java.util.Calendar.MONTH), 1).show();
@@ -136,6 +147,11 @@ public class MainActivity extends AppCompatActivity {
             findViewById(R.id.btn4thSunday),
             findViewById(R.id.btn5thSunday)
         };
+    }
+
+    private void openManageMembers() {
+        Intent intent = new Intent(this, ManageMembersActivity.class);
+        startActivity(intent);
     }
 
     // ── Sunday buttons ────────────────────────────────────────────────────────
@@ -155,14 +171,34 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void updateSundayButtonStates() {
+        int totalSundays = countSundaysInMonth(selectedCalendar);
+
+        // Safety check: if user had 5th week selected but new month only has 4, snap back to 4.
+        if (selectedSunday > totalSundays) {
+            selectedSunday = totalSundays;
+        }
+
         int activeColor   = getColor(R.color.accent_blue);
         int inactiveColor = 0xFF2A2A3D;
         for (int i = 0; i < sundayBtns.length; i++) {
-            boolean active = (i + 1 == selectedSunday);
-            sundayBtns[i].setBackgroundTintList(
-                    android.content.res.ColorStateList.valueOf(
-                            active ? activeColor : inactiveColor));
-            sundayBtns[i].setTextColor(active ? 0xFFFFFFFF : 0xFF9E9E9E);
+            int sundayIndex = i + 1;
+            boolean active = (sundayIndex == selectedSunday);
+            boolean available = (sundayIndex <= totalSundays);
+
+            sundayBtns[i].setEnabled(available);
+
+            if (available) {
+                sundayBtns[i].setBackgroundTintList(
+                        android.content.res.ColorStateList.valueOf(
+                                active ? activeColor : inactiveColor));
+                sundayBtns[i].setTextColor(active ? 0xFFFFFFFF : 0xFF9E9E9E);
+                sundayBtns[i].setAlpha(1.0f);
+            } else {
+                sundayBtns[i].setBackgroundTintList(
+                        android.content.res.ColorStateList.valueOf(inactiveColor));
+                sundayBtns[i].setTextColor(0xFF555555);
+                sundayBtns[i].setAlpha(0.4f);
+            }
         }
     }
 
@@ -246,29 +282,19 @@ public class MainActivity extends AppCompatActivity {
             tvSelectedService.setText("No service selected");
         }
 
-        // Hint + FAB
+        // Hint
         boolean ready = selectedService != 0;
-        tvSelectionHint.setVisibility(ready ? android.view.View.GONE : android.view.View.VISIBLE);
+        tvSelectionHint.setVisibility(android.view.View.VISIBLE);
         tvSelectionHint.setText(ready
                 ? "✅ " + ordinals[selectedSunday - 1] + " Sunday — "
                   + (selectedService == 1 ? "1st Service" : "2nd Service")
                 : "⚠ Please select both a Sunday and a Service to enable scanning.");
-        tvSelectionHint.setVisibility(android.view.View.VISIBLE);
         tvSelectionHint.setTextColor(ready ? 0xFF81C784 : 0xFFFFB74D);
-
-        fabCamera.setEnabled(ready);
-        fabCamera.setAlpha(ready ? 1.0f : 0.4f);
     }
 
     // ── FABs ──────────────────────────────────────────────────────────────────
 
     private void setupFabs() {
-        fabCamera.setOnClickListener(v -> {
-            if (!checkCameraPermission()) return;
-            Intent intent = new Intent(this, CameraActivity.class);
-            cameraLauncher.launch(intent);
-        });
-
         // Gallery FAB — multi-select images from gallery
         fabGallery.setOnClickListener(v -> {
             if (selectedService == 0) {
@@ -281,8 +307,13 @@ public class MainActivity extends AppCompatActivity {
             galleryLauncher.launch(pick);
         });
 
-        // Enhance FAB — always enabled (no Sunday/Service dependency)
-        fabEnhance.setOnClickListener(v -> showEnhanceSourceDialog());
+        // Enhance FAB — directly open Gallery to pick images for enhancement
+        fabEnhance.setOnClickListener(v -> {
+            Intent pick = new Intent(Intent.ACTION_GET_CONTENT);
+            pick.setType("image/*");
+            pick.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true);
+            enhanceGalleryLauncher.launch(pick);
+        });
     }
 
     // ── Camera result → /scan → ReviewActivity ─────────────────────────────
@@ -364,6 +395,10 @@ public class MainActivity extends AppCompatActivity {
      * On completion, merges all rows and opens ReviewActivity.
      */
     private void scanUrisSequentially(java.util.List<android.net.Uri> uris) {
+        fetchDbMembers(() -> performBatchScan(uris));
+    }
+
+    private void performBatchScan(java.util.List<android.net.Uri> uris) {
         // ── Custom batch loading dialog ────────────────────────────────────
         Dialog batchDialog = new Dialog(this);
         batchDialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
@@ -412,7 +447,7 @@ public class MainActivity extends AppCompatActivity {
         if (index[0] >= total) {
             batchDialog.dismiss();
             getWindow().clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
-            openReviewWithRows(allRows);
+            openReviewWithRows(allRows, uris);
             return;
         }
 
@@ -512,7 +547,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     /** Open ReviewActivity with pre-merged rows (de-duplicated by last+first name). */
-    private void openReviewWithRows(java.util.List<JSONObject> allRows) {
+    private void openReviewWithRows(java.util.List<JSONObject> allRows, java.util.List<android.net.Uri> uris) {
         // De-duplicate by last_name + first_name key
         java.util.LinkedHashMap<String, JSONObject> seen = new java.util.LinkedHashMap<>();
         for (JSONObject r : allRows) {
@@ -541,6 +576,8 @@ public class MainActivity extends AppCompatActivity {
         JSONArray merged = new JSONArray();
         for (JSONObject r : seen.values()) merged.put(r);
 
+        NameMatcher.autoCorrectNames(merged, cachedDbMembers);
+
         int flaggedCount = 0;
         for (int i = 0; i < merged.length(); i++) {
             JSONObject row = merged.optJSONObject(i);
@@ -554,6 +591,15 @@ public class MainActivity extends AppCompatActivity {
         intent.putExtra(ReviewActivity.EXTRA_FLAGGED,   flaggedCount);
         intent.putExtra(ReviewActivity.EXTRA_YEAR,      selectedCalendar.get(java.util.Calendar.YEAR));
         intent.putExtra(ReviewActivity.EXTRA_MONTH,     selectedCalendar.get(java.util.Calendar.MONTH));
+        
+        java.util.ArrayList<String> uriStrings = new java.util.ArrayList<>();
+        if (uris != null) {
+            for (android.net.Uri uri : uris) {
+                uriStrings.add(uri.toString());
+            }
+        }
+        intent.putStringArrayListExtra(ImageViewerActivity.EXTRA_IMAGE_URIS, uriStrings);
+        
         startActivity(intent);
     }
 
@@ -569,7 +615,43 @@ public class MainActivity extends AppCompatActivity {
             "Building attendance table…"
     };
 
+    private void fetchDbMembers(Runnable onLoaded) {
+        if (SupabaseClient.getApiService() == null) {
+            onLoaded.run();
+            return;
+        }
+        SupabaseClient.getApiService().getMembers().enqueue(new Callback<String>() {
+            @Override
+            public void onResponse(@NonNull Call<String> call, @NonNull Response<String> response) {
+                cachedDbMembers.clear();
+                if (response.isSuccessful() && response.body() != null) {
+                    try {
+                        JSONArray arr = new JSONArray(response.body());
+                        for (int i = 0; i < arr.length(); i++) {
+                            JSONObject obj = arr.getJSONObject(i);
+                            String id = obj.optString("id", "");
+                            String f = obj.optString("first_name", "");
+                            String l = obj.optString("last_name", "");
+                            String n = obj.optString("network_name", "");
+                            cachedDbMembers.add(new NameMatcher.DbMember(id, f, l, n));
+                        }
+                    } catch (Exception e) {}
+                }
+                onLoaded.run();
+            }
+
+            @Override
+            public void onFailure(@NonNull Call<String> call, @NonNull Throwable t) {
+                onLoaded.run();
+            }
+        });
+    }
+
     private void scanImageAndOpenReview(String imagePath) {
+        fetchDbMembers(() -> performSingleScan(imagePath));
+    }
+
+    private void performSingleScan(String imagePath) {
         // ── Custom dark loading dialog ─────────────────────────────────────
         Dialog dialog = new Dialog(this);
         dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
@@ -620,7 +702,7 @@ public class MainActivity extends AppCompatActivity {
                         getWindow().clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
                         if (resp.isSuccessful() && resp.body() != null) {
                             try {
-                                openReview(resp.body().string());
+                                openReview(resp.body().string(), imagePath);
                             } catch (IOException e) {
                                 showToast("Could not read scan response.");
                             }
@@ -641,14 +723,28 @@ public class MainActivity extends AppCompatActivity {
                 });
     }
 
-    private void openReview(String fullJson) {
+    private void openReview(String fullJson, String imagePath) {
         int flaggedCount = 0;
         String rowsJson  = "[]";
         try {
             org.json.JSONObject obj = new org.json.JSONObject(fullJson);
-            flaggedCount = obj.optInt("flagged_count", 0);
-            rowsJson     = obj.optJSONArray("rows") != null
-                    ? obj.getJSONArray("rows").toString() : "[]";
+            JSONArray rowsArray = obj.optJSONArray("rows");
+            if (rowsArray != null) {
+                NameMatcher.autoCorrectNames(rowsArray, cachedDbMembers);
+                
+                // Recalculate flagged count and clear attendance
+                for (int i = 0; i < rowsArray.length(); i++) {
+                    JSONObject row = rowsArray.optJSONObject(i);
+                    if (row != null) {
+                        row.put("id", java.util.UUID.randomUUID().toString());
+                        org.json.JSONArray emptyAtt = new org.json.JSONArray();
+                        for (int j = 0; j < 10; j++) emptyAtt.put(false);
+                        row.put("attendance", emptyAtt);
+                        if (row.optBoolean("flagged", false)) flaggedCount++;
+                    }
+                }
+                rowsJson = rowsArray.toString();
+            }
         } catch (Exception e) {
             showToast("Parse error: " + e.getMessage());
             return;
@@ -661,6 +757,13 @@ public class MainActivity extends AppCompatActivity {
         intent.putExtra(ReviewActivity.EXTRA_FLAGGED,   flaggedCount);
         intent.putExtra(ReviewActivity.EXTRA_YEAR,      selectedCalendar.get(java.util.Calendar.YEAR));
         intent.putExtra(ReviewActivity.EXTRA_MONTH,     selectedCalendar.get(java.util.Calendar.MONTH));
+        
+        java.util.ArrayList<String> uriStrings = new java.util.ArrayList<>();
+        if (imagePath != null) {
+            uriStrings.add(imagePath);
+        }
+        intent.putStringArrayListExtra(ImageViewerActivity.EXTRA_IMAGE_URIS, uriStrings);
+        
         startActivity(intent);
     }
 

@@ -118,6 +118,47 @@
                 </LinearLayout>
             </androidx.cardview.widget.CardView>
 
+            <!-- ══ WEEK TOGGLES ════════════════════════════════════════════════ -->
+            <androidx.cardview.widget.CardView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="12dp"
+                android:layout_marginEnd="12dp"
+                android:layout_marginTop="12dp"
+                app:cardBackgroundColor="@color/card_dark"
+                app:cardCornerRadius="12dp"
+                app:cardElevation="3dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="16dp">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="ACTIVE WEEKS"
+                        android:textColor="@color/text_secondary"
+                        android:textSize="10sp"
+                        android:textAllCaps="true"
+                        android:letterSpacing="0.12"
+                        android:layout_marginBottom="8dp" />
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal">
+                        
+                        <CheckBox android:id="@+id/cbWk1" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:text="W1" android:checked="true" android:textColor="@color/text_primary" buttonTint="@color/accent_blue" />
+                        <CheckBox android:id="@+id/cbWk2" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:text="W2" android:checked="true" android:textColor="@color/text_primary" buttonTint="@color/accent_blue" />
+                        <CheckBox android:id="@+id/cbWk3" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:text="W3" android:checked="true" android:textColor="@color/text_primary" buttonTint="@color/accent_blue" />
+                        <CheckBox android:id="@+id/cbWk4" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:text="W4" android:checked="true" android:textColor="@color/text_primary" buttonTint="@color/accent_blue" />
+                        <CheckBox android:id="@+id/cbWk5" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:text="W5" android:checked="true" android:textColor="@color/text_primary" buttonTint="@color/accent_blue" />
+                    </LinearLayout>
+                </LinearLayout>
+            </androidx.cardview.widget.CardView>
+
             <!-- ══ ADD IMAGES BUTTON ═══════════════════════════════════════════ -->
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnAddImages"
@@ -131,6 +172,19 @@
                 android:textColor="@color/accent_blue"
                 app:strokeColor="@color/accent_blue"
                 app:cornerRadius="12dp" />
+
+            <!-- ══ RESUME BATCH BUTTON ═════════════════════════════════════════ -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnResumeBatch"
+                style="@style/Widget.MaterialComponents.Button.TextButton"
+                android:layout_width="match_parent"
+                android:layout_height="56dp"
+                android:layout_marginStart="16dp"
+                android:layout_marginEnd="16dp"
+                android:layout_marginTop="8dp"
+                android:text="Resume Previous Batch"
+                android:textColor="@color/accent_blue"
+                android:visibility="gone" />
 
             <!-- ══ RECYCLER VIEW FOR THUMBNAILS ════════════════════════════════ -->
             <androidx.recyclerview.widget.RecyclerView

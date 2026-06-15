@@ -29,12 +29,15 @@ public class ReviewFragment extends Fragment implements ReviewAdapter.OnDataChan
 
     private RecyclerView recyclerView;
     private ReviewAdapter adapter;
-    private Button btnAddRow, btnPurgeDeleted;
+    private View btnPurgeDeleted;
+    private com.google.android.material.floatingactionbutton.FloatingActionButton fabAddMember;
     private LinearLayout bannerFlagged;
     private TextView tvBannerText, tvAttHeader;
     private View emptyStateLayout;
 
+    private final List<AttendanceRow> allRows = new ArrayList<>();
     private final List<AttendanceRow> rows = new ArrayList<>();
+    private String currentQuery = "";
     private int sundayNum = 1;
     private int serviceNum = 1;
 
@@ -101,12 +104,14 @@ public class ReviewFragment extends Fragment implements ReviewAdapter.OnDataChan
         super.onSaveInstanceState(outState);
         try {
             org.json.JSONArray arr = new org.json.JSONArray();
-            for (AttendanceRow r : rows) {
+            for (AttendanceRow r : allRows) {
                 org.json.JSONObject obj = new org.json.JSONObject();
+                obj.put("id", r.id);
                 obj.put("last_name", r.lastName);
                 obj.put("last_name_conf", r.lastNameConf);
                 obj.put("first_name", r.firstName);
                 obj.put("first_name_conf", r.firstNameConf);
+                obj.put("db_id", r.db_id);
                 obj.put("network", r.network);
                 obj.put("network_conf", r.networkConf);
                 obj.put("flagged", r.flagged);
@@ -134,14 +139,14 @@ public class ReviewFragment extends Fragment implements ReviewAdapter.OnDataChan
         View v = inflater.inflate(R.layout.fragment_review, container, false);
 
         recyclerView = v.findViewById(R.id.reviewRecyclerView);
-        btnAddRow = v.findViewById(R.id.btnAddRow);
+        fabAddMember = v.findViewById(R.id.fabAddMember);
         btnPurgeDeleted = v.findViewById(R.id.btnPurgeDeleted);
         bannerFlagged = v.findViewById(R.id.bannerFlagged);
         tvBannerText = v.findViewById(R.id.tvBannerText);
         tvAttHeader = v.findViewById(R.id.tvAttHeader);
         emptyStateLayout = v.findViewById(R.id.emptyStateLayout);
 
-        setupRecyclerView();
+        setupRecyclerView(v);
         setupButtons();
         refreshBanner();
 
@@ -158,104 +163,227 @@ public class ReviewFragment extends Fragment implements ReviewAdapter.OnDataChan
     }
 
     private void parseRowsJson(String json) {
-        rows.clear();
+        allRows.clear();
         try {
             JSONArray arr = new JSONArray(json);
             for (int i = 0; i < arr.length(); i++) {
                 JSONObject obj = arr.getJSONObject(i);
 
+                String id         = obj.optString("id", java.util.UUID.randomUUID().toString());
                 String lastName   = obj.optString("last_name",  "");
                 int    lastConf   = obj.optInt   ("last_name_conf",  0);
                 String firstName  = obj.optString("first_name", "");
                 int    firstConf  = obj.optInt   ("first_name_conf", 0);
+                String db_id      = obj.optString("db_id", null);
                 String network    = obj.optString("network",    "");
                 int    netConf    = obj.optInt   ("network_conf",    0);
                 boolean flagged   = obj.optBoolean("flagged",   false);
 
                 boolean[] att = new boolean[10];
-                JSONArray attArr = obj.optJSONArray("attendance");
-                if (attArr != null) {
-                    for (int j = 0; j < Math.min(attArr.length(), 10); j++) {
-                        att[j] = attArr.optBoolean(j, false);
-                    }
-                }
+                // Ignored backend attendance to force manual check:
+                // JSONArray attArr = obj.optJSONArray("attendance");
+                // if (attArr != null) {
+                //     for (int j = 0; j < Math.min(attArr.length(), 10); j++) {
+                //         att[j] = attArr.optBoolean(j, false);
+                //     }
+                // }
 
-                rows.add(new AttendanceRow(
+                AttendanceRow row = new AttendanceRow(
+                        id,
                         lastName, lastConf,
                         firstName, firstConf,
                         network, netConf,
-                        att, flagged));
+                        att, flagged);
+                row.db_id = db_id;
+                allRows.add(row);
             }
+            filterRows("");
         } catch (Exception e) {
             // Error parsing
         }
     }
     
     private void parseRowsJsonWithState(String json) {
-        rows.clear();
+        allRows.clear();
         try {
             JSONArray arr = new JSONArray(json);
             for (int i = 0; i < arr.length(); i++) {
                 JSONObject obj = arr.getJSONObject(i);
                 
+                String id         = obj.optString("id", java.util.UUID.randomUUID().toString());
                 String lastName   = obj.optString("last_name",  "");
                 int    lastConf   = obj.optInt   ("last_name_conf",  0);
                 String firstName  = obj.optString("first_name", "");
                 int    firstConf  = obj.optInt   ("first_name_conf", 0);
+                String db_id      = obj.optString("db_id", null);
                 String network    = obj.optString("network",    "");
                 int    netConf    = obj.optInt   ("network_conf",    0);
                 boolean flagged   = obj.optBoolean("flagged",   false);
                 
                 boolean[] att = new boolean[10];
-                JSONArray attArr = obj.optJSONArray("attendance");
-                if (attArr != null) {
-                    for (int j = 0; j < Math.min(attArr.length(), 10); j++) {
-                        att[j] = attArr.optBoolean(j, false);
-                    }
-                }
+                // Ignored backend attendance to force manual check:
+                // JSONArray attArr = obj.optJSONArray("attendance");
+                // if (attArr != null) {
+                //     for (int j = 0; j < Math.min(attArr.length(), 10); j++) {
+                //         att[j] = attArr.optBoolean(j, false);
+                //     }
+                // }
                 
                 AttendanceRow row = new AttendanceRow(
+                        id,
                         lastName, lastConf,
                         firstName, firstConf,
                         network, netConf,
                         att, flagged);
+                row.db_id = db_id;
                 row.manuallyAdded = obj.optBoolean("manually_added", false);
                 row.markedForDeletion = obj.optBoolean("marked_for_deletion", false);
-                rows.add(row);
+                allRows.add(row);
             }
+            filterRows("");
         } catch (Exception e) {
             // Error parsing
         }
     }
 
-    private void setupRecyclerView() {
+    private void setupRecyclerView(View v) {
         adapter = new ReviewAdapter(requireContext(), rows, this, selectedColumn());
+        adapter.setOnRowEditedListener(new ReviewAdapter.OnRowEditedListener() {
+            @Override
+            public void onRowEditedGlobally(String id, String newLast, String newFirst, String newNet) {
+                if (getActivity() instanceof BatchReviewActivity) {
+                    ((BatchReviewActivity) getActivity()).onRowEditedGlobally(id, newLast, newFirst, newNet);
+                }
+                if (fragmentDataChangedListener != null) {
+                    fragmentDataChangedListener.onFragmentDataChanged();
+                }
+            }
+
+            @Override
+            public void onRowAddedGlobally(String id, String lastName, String firstName, String network) {
+                if (getActivity() instanceof BatchReviewActivity) {
+                    ((BatchReviewActivity) getActivity()).onRowAddedGlobally(id, lastName, firstName, network);
+                }
+                if (fragmentDataChangedListener != null) {
+                    fragmentDataChangedListener.onFragmentDataChanged();
+                }
+            }
+        });
         recyclerView.setLayoutManager(new LinearLayoutManager(requireContext()));
         recyclerView.setAdapter(adapter);
+
+        AlphabetIndexScroller scroller = v.findViewById(R.id.alphabetScroller);
+        if (scroller != null) {
+            scroller.setRecyclerView(recyclerView, adapter);
+        }
+
+        androidx.appcompat.widget.SearchView searchView = v.findViewById(R.id.searchView);
+        if (searchView != null) {
+            searchView.setOnQueryTextListener(new androidx.appcompat.widget.SearchView.OnQueryTextListener() {
+                @Override
+                public boolean onQueryTextSubmit(String query) {
+                    filterRows(query);
+                    return true;
+                }
+                @Override
+                public boolean onQueryTextChange(String newText) {
+                    filterRows(newText);
+                    return true;
+                }
+            });
+        }
 
         if (tvAttHeader != null) tvAttHeader.setText(sessionLabel());
         updateEmptyState();
     }
 
-    private void setupButtons() {
-        btnAddRow.setOnClickListener(v -> {
-            rows.add(new AttendanceRow());
-            adapter.notifyItemInserted(rows.size() - 1);
-            recyclerView.scrollToPosition(rows.size() - 1);
-            updateEmptyState();
-            refreshBanner();
+    private void filterRows(String query) {
+        currentQuery = query == null ? "" : query.trim().toLowerCase(java.util.Locale.getDefault());
+        rows.clear();
+        for (AttendanceRow r : allRows) {
+            if (currentQuery.isEmpty() ||
+                r.lastName.toLowerCase(java.util.Locale.getDefault()).contains(currentQuery) ||
+                r.firstName.toLowerCase(java.util.Locale.getDefault()).contains(currentQuery)) {
+                rows.add(r);
+            }
+        }
+        java.util.Collections.sort(rows, (r1, r2) -> {
+            int cmp = r1.lastName.compareToIgnoreCase(r2.lastName);
+            if (cmp == 0) return r1.firstName.compareToIgnoreCase(r2.firstName);
+            return cmp;
         });
+        if (adapter != null) adapter.notifyDataSetChanged();
+        updateEmptyState();
+    }
+
+    private void setupButtons() {
+        if (fabAddMember != null) {
+            fabAddMember.setOnClickListener(v -> showAddMemberDialog());
+        }
 
         btnPurgeDeleted.setOnClickListener(v -> {
-            rows.removeIf(r -> r.markedForDeletion);
-            adapter.notifyDataSetChanged();
-            updateEmptyState();
+            allRows.removeIf(r -> r.markedForDeletion);
+            filterRows(currentQuery);
             refreshBanner();
         });
     }
 
+    private void showAddMemberDialog() {
+        android.app.Dialog dialog = new android.app.Dialog(requireContext());
+        dialog.requestWindowFeature(android.view.Window.FEATURE_NO_TITLE);
+        dialog.setContentView(R.layout.dialog_add_member);
+        dialog.getWindow().setLayout(android.view.ViewGroup.LayoutParams.MATCH_PARENT, android.view.ViewGroup.LayoutParams.WRAP_CONTENT);
+        dialog.getWindow().setBackgroundDrawableResource(android.R.color.transparent);
+
+        com.google.android.material.textfield.TextInputEditText etFirst = dialog.findViewById(R.id.etFirstName);
+        com.google.android.material.textfield.TextInputEditText etLast = dialog.findViewById(R.id.etLastName);
+        com.google.android.material.textfield.TextInputEditText etNet = dialog.findViewById(R.id.etNetwork);
+        
+        dialog.findViewById(R.id.btnCancel).setOnClickListener(view -> dialog.dismiss());
+        dialog.findViewById(R.id.btnAdd).setOnClickListener(view -> {
+            String first = etFirst.getText().toString().trim();
+            String last = etLast.getText().toString().trim();
+            String net = etNet.getText().toString().trim();
+            if (first.isEmpty() || last.isEmpty() || net.isEmpty()) {
+                android.widget.Toast.makeText(requireContext(), "Please fill in all fields", android.widget.Toast.LENGTH_SHORT).show();
+                return;
+            }
+            
+            String newId = java.util.UUID.randomUUID().toString();
+            AttendanceRow newRow = new AttendanceRow(newId, last, 100, first, 100, net, 100, new boolean[10], false);
+            newRow.manuallyAdded = true;
+            
+            addRowGlobally(newRow);
+            
+            if (getActivity() instanceof BatchReviewActivity) {
+                ((BatchReviewActivity) getActivity()).onRowAddedGlobally(newId, last, first, net);
+            }
+            dialog.dismiss();
+        });
+        dialog.show();
+    }
+
+    public void addRowGlobally(AttendanceRow row) {
+        for (AttendanceRow r : allRows) {
+            if (r.id != null && r.id.equals(row.id)) return;
+        }
+        allRows.add(row);
+        filterRows(currentQuery);
+        refreshBanner();
+    }
+
+    public void addRowGlobally(String id, String lastName, String firstName, String network) {
+        // Skip if already exists
+        for (AttendanceRow r : allRows) {
+            if (r.id != null && r.id.equals(id)) return;
+        }
+        AttendanceRow newRow = new AttendanceRow(id, lastName, 100, firstName, 100, network, 100, new boolean[10], false);
+        newRow.manuallyAdded = true;
+        addRowGlobally(newRow);
+    }
+
     private void updateEmptyState() {
-        long active = rows.stream().filter(r -> !r.markedForDeletion).count();
+        long active = allRows.stream().filter(r -> !r.markedForDeletion).count();
         emptyStateLayout.setVisibility(active == 0 ? View.VISIBLE : View.GONE);
     }
 
@@ -272,7 +400,7 @@ public class ReviewFragment extends Fragment implements ReviewAdapter.OnDataChan
         int flaggedCount = 0;
         boolean hasDeleted = false;
 
-        for (AttendanceRow r : rows) {
+        for (AttendanceRow r : allRows) {
             if (r.markedForDeletion) { hasDeleted = true; continue; }
             if (r.flagged) flaggedCount++;
         }
@@ -287,12 +415,11 @@ public class ReviewFragment extends Fragment implements ReviewAdapter.OnDataChan
         btnPurgeDeleted.setVisibility(hasDeleted ? View.VISIBLE : View.GONE);
     }
 
-    // Used by Activity to check if this tab is ready for export
     public boolean canExport() {
         int flaggedCount = 0;
         boolean anyInvalid = false;
 
-        for (AttendanceRow r : rows) {
+        for (AttendanceRow r : allRows) {
             if (r.markedForDeletion) continue;
             if (r.flagged) flaggedCount++;
             if (r.lastName.trim().isEmpty() || r.firstName.trim().isEmpty() || r.network.trim().isEmpty()) {
@@ -300,13 +427,25 @@ public class ReviewFragment extends Fragment implements ReviewAdapter.OnDataChan
             }
         }
 
-        long activeRows = rows.stream().filter(r -> !r.markedForDeletion).count();
-        // Flagged rows are allowed — they are just highlighted yellow for visual review
+        long activeRows = allRows.stream().filter(r -> !r.markedForDeletion).count();
         return activeRows == 0 || !anyInvalid;
     }
 
-    // Return current rows to export
     public List<AttendanceRow> getRows() {
         return rows;
+    }
+
+    public void updateRowGlobally(String id, String newLastName, String newFirstName, String newNetwork) {
+        for (int i = 0; i < allRows.size(); i++) {
+            if (allRows.get(i).id != null && allRows.get(i).id.equals(id)) {
+                allRows.get(i).lastName  = newLastName;
+                allRows.get(i).firstName = newFirstName;
+                allRows.get(i).network   = newNetwork;
+                allRows.get(i).flagged   = false;
+                
+                filterRows(currentQuery);
+                break;
+            }
+        }
     }
 }

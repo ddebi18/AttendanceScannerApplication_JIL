@@ -167,7 +167,7 @@ Rules:
 - CRITICAL: Return the rows in the EXACT physical top-to-bottom order as they appear on the page. DO NOT sort them alphabetically.
 - Include ALL person data rows — even those with no check marks.
 - CRITICAL: The physical document has separate columns for LAST NAME and FIRST NAME. You MUST extract them into separate fields exactly as written. DO NOT concatenate the first name into the last_name field. If a column is blank, leave its field empty.
-- The "attendance" list must contain exactly 10 boolean values corresponding to the 10 columns. Set each to true only if there is a visible check mark, tick (✓), slash (/), or any written mark in that column's cell for that person. If the cell is empty, set it to false.
+- The "attendance" list must contain exactly 10 boolean values. You MUST set all 10 values to false (e.g. `[false, false, false, false, false, false, false, false, false, false]`), regardless of whether there are check marks in the image or not. The user wants to manually check attendance later.
 - Use UPPERCASE for all name and network values.
 - Do NOT read vertical cell border lines as part of a name. If a name begins with a stray "I", "L", or "J" that is clearly a grid line artifact, drop that leading character.
 - Map network values to the closest of: MEN, WOMEN, KKB, YAN, CHILDREN. If truly unclear, use "NOT IDENTIFIED".
@@ -215,19 +215,24 @@ def _auto_orient(image: np.ndarray) -> np.ndarray:
             pil_small = PILImage.fromarray(small_rgb)
             
             osd = pytesseract.image_to_osd(pil_small, output_type=pytesseract.Output.DICT)
-            rot = osd.get("rotate", 0)
-            
-            if rot == 90:
-                log.info("  OSD: rotating 90 CW")
+            rot  = osd.get("rotate", 0)
+            conf = osd.get("orientation_conf", 0.0)  # confidence 0-100
+
+            # Only trust OSD if it has high confidence.
+            # Sparse sheets (few rows) can fool OSD into reporting the wrong angle.
+            if conf < 4.0:
+                log.info("  OSD: low orientation confidence (%.2f) — skipping rotation.", conf)
+            elif rot == 90:
+                log.info("  OSD: rotating 90 CW (conf=%.2f)", conf)
                 return cv2.rotate(image, cv2.ROTATE_90_CLOCKWISE)
             elif rot == 180:
-                log.info("  OSD: rotating 180")
+                log.info("  OSD: rotating 180 (conf=%.2f)", conf)
                 return cv2.rotate(image, cv2.ROTATE_180)
             elif rot == 270:
-                log.info("  OSD: rotating 90 CCW")
+                log.info("  OSD: rotating 90 CCW (conf=%.2f)", conf)
                 return cv2.rotate(image, cv2.ROTATE_90_COUNTERCLOCKWISE)
-            
-            log.info("  OSD: image is upright (0 deg).")
+            else:
+                log.info("  OSD: image is upright (0 deg, conf=%.2f).", conf)
             return image
         except Exception as e:
             log.warning("  OSD orientation failed: %s", e)
@@ -1040,14 +1045,8 @@ def _process_image_with_gemini(img_bytes: bytes,
 def _enhance_for_gemini(img_bytes: bytes) -> bytes:
     """
     Pre-process the raw camera photo into a clean, flat document image
-    before sending to Gemini.  Steps:
-      1. Auto-orient (portrait)
-      2. Resize to ≤ MAX_WIDTH
-      3. Perspective warp (if a reliable document quad is found)
-      4. CLAHE contrast enhancement (grayscale)
-      5. Unsharp-mask sharpening
-      6. Re-encode as high-quality JPEG
-    Returns the enhanced image as JPEG bytes.
+    before sending to Gemini.
+    Optimized for handwritten sheets: NO perspective warp, NO adaptive binarization.
     """
     bgr = _decode_image(img_bytes)
     if bgr is None or bgr.size == 0:
@@ -1057,64 +1056,19 @@ def _enhance_for_gemini(img_bytes: bytes) -> bytes:
     img_bgr = _auto_orient(bgr)
     img_bgr = _resize(img_bgr, max_width=1600)
 
-    # 1. Mathematically Perfect Paper Cropping
-    grid_corners = _find_document_corners(img_bgr)
-    
-    found_corners = None
-    if grid_corners is not None:
-        tl, tr, br, bl = grid_corners
-        left_vec = bl - tl
-        right_vec = br - tr
-        
-        tl_new = tl - left_vec * 0.20
-        tr_new = tr - right_vec * 0.20
-        bl_new = bl + left_vec * 0.05
-        br_new = br + right_vec * 0.05
-        
-        top_vec_new = tr_new - tl_new
-        bottom_vec_new = br_new - bl_new
-        
-        tl_final = tl_new - top_vec_new * 0.05
-        bl_final = bl_new - bottom_vec_new * 0.05
-        tr_final = tr_new + top_vec_new * 0.05
-        br_final = br_new + bottom_vec_new * 0.05
-        
-        h, w = img_bgr.shape[:2]
-        found_corners = np.array([
-            np.clip(tl_final, [0, 0], [w, h]),
-            np.clip(tr_final, [0, 0], [w, h]),
-            np.clip(br_final, [0, 0], [w, h]),
-            np.clip(bl_final, [0, 0], [w, h])
-        ], dtype=np.float32)
+    # For handwritten grids, Gemini works BEST with the raw colored image.
+    # We do a slight CLAHE to improve contrast, but we DO NOT threshold or binarize
+    # because that destroys faint pencil marks.
+    lab = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2LAB)
+    l, a, b = cv2.split(lab)
+    clahe = cv2.createCLAHE(clipLimit=1.5, tileGridSize=(8, 8))
+    l = clahe.apply(l)
+    merged = cv2.merge((l, a, b))
+    enhanced_bgr = cv2.cvtColor(merged, cv2.COLOR_LAB2BGR)
 
-    if found_corners is not None:
-        img_bgr = _perspective_warp(img_bgr, found_corners)
-        
-    gray = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2GRAY)
-    
-    # 2. Perfect Lighting Flattening (Background Division)
-    kernel = np.ones((15, 15), np.uint8)
-    bg = cv2.dilate(gray, kernel, iterations=1)
-    bg = cv2.GaussianBlur(bg, (21, 21), 0)
-
-    gray_f = gray.astype(np.float32)
-    bg_f = bg.astype(np.float32)
-    bg_f[bg_f == 0] = 1.0 # Avoid division by zero
-    
-    diff = (gray_f / bg_f) * 255.0
-    diff = np.clip(diff, 0, 255).astype(np.uint8)
-
-    # 3. Razor Sharp Text Binarization
-    clean_binary = cv2.adaptiveThreshold(
-        diff, 255,
-        cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
-        cv2.THRESH_BINARY,
-        blockSize=21, C=15
-    )
-
-    _, buf = cv2.imencode(".jpg", clean_binary, [cv2.IMWRITE_JPEG_QUALITY, 95])
+    _, buf = cv2.imencode(".jpg", enhanced_bgr, [cv2.IMWRITE_JPEG_QUALITY, 95])
     log.info("  Enhanced image for Gemini: %dx%d → %d bytes",
-             clean_binary.shape[1], clean_binary.shape[0], len(buf))
+             enhanced_bgr.shape[1], enhanced_bgr.shape[0], len(buf))
     return buf.tobytes()
 
 
@@ -1412,10 +1366,7 @@ def enhance():
     """
     POST /enhance
     Accepts a single image (multipart/form-data, field: 'image').
-    Runs the full CamScanner-style preprocessing pipeline and returns
-    the enhanced image as a high-quality JPEG.
-
-    Response: image/jpeg bytes (200) or JSON error (400/500).
+    Optimized for handwritten sheets: NO perspective warp, NO adaptive binarization.
     """
     image_file = request.files.get("image")
     if not image_file:
@@ -1430,84 +1381,22 @@ def enhance():
             return jsonify({"error": "Could not decode image."}), 400
 
         img_bgr = _auto_orient(bgr)
-        img_bgr = _resize(img_bgr) # Resizes to max width 1600 for performance
+        img_bgr = _resize(img_bgr, max_width=1600)
 
-        gray = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2GRAY)
-        
-        # 1. Mathematically Perfect Paper Cropping
-        # We detect the internal grid perfectly, then expand its corners 
-        # generously (20% up, 5% sides) to guarantee we capture the entire 
-        # paper and headers without grabbing the messy desk.
-        grid_corners = _find_document_corners(img_bgr)
-        
-        found_corners = None
-        if grid_corners is not None:
-            tl, tr, br, bl = grid_corners
-            
-            left_vec = bl - tl
-            right_vec = br - tr
-            
-            # Expand Top (20%) to definitely include the header, Bottom (5%)
-            tl_new = tl - left_vec * 0.20
-            tr_new = tr - right_vec * 0.20
-            bl_new = bl + left_vec * 0.05
-            br_new = br + right_vec * 0.05
-            
-            top_vec_new = tr_new - tl_new
-            bottom_vec_new = br_new - bl_new
-            
-            # Expand Left (5%) and Right (5%)
-            tl_final = tl_new - top_vec_new * 0.05
-            bl_final = bl_new - bottom_vec_new * 0.05
-            
-            tr_final = tr_new + top_vec_new * 0.05
-            br_final = br_new + bottom_vec_new * 0.05
-            
-            h, w = img_bgr.shape[:2]
-            found_corners = np.array([
-                np.clip(tl_final, [0, 0], [w, h]),
-                np.clip(tr_final, [0, 0], [w, h]),
-                np.clip(br_final, [0, 0], [w, h]),
-                np.clip(bl_final, [0, 0], [w, h])
-            ], dtype=np.float32)
+        # For handwritten grids, we DO NOT binarize.
+        # We just apply a slight CLAHE to improve contrast and send it back.
+        lab = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2LAB)
+        l, a, b = cv2.split(lab)
+        clahe = cv2.createCLAHE(clipLimit=1.5, tileGridSize=(8, 8))
+        l = clahe.apply(l)
+        merged = cv2.merge((l, a, b))
+        enhanced_bgr = cv2.cvtColor(merged, cv2.COLOR_LAB2BGR)
 
-        # Apply crop
-        if found_corners is not None:
-            img_bgr = _perspective_warp(img_bgr, found_corners)
-            
-        gray = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2GRAY)
-        
-        # 2. Perfect Lighting Flattening (Background Division)
-        # We divide the image by its own blurred background. This instantly
-        # flattens all shadows and lighting, making the paper pure white
-        # without blowing out faint text.
-        kernel = np.ones((15, 15), np.uint8)
-        bg = cv2.dilate(gray, kernel, iterations=1)
-        bg = cv2.GaussianBlur(bg, (21, 21), 0)
-
-        gray_f = gray.astype(np.float32)
-        bg_f = bg.astype(np.float32)
-        bg_f[bg_f == 0] = 1.0 # Avoid division by zero
-        
-        diff = (gray_f / bg_f) * 255.0
-        diff = np.clip(diff, 0, 255).astype(np.uint8)
-
-        # 3. Razor Sharp Text Binarization
-        # We use a small blockSize (21) from the proven OCR logic, paired with 
-        # C=15 on the flattened lighting image. This guarantees razor sharp, 
-        # un-smudged text that preserves faint headers flawlessly.
-        clean_binary = cv2.adaptiveThreshold(
-            diff, 255,
-            cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
-            cv2.THRESH_BINARY,
-            blockSize=21, C=15
-        )
-
-        _, buf = cv2.imencode(".jpg", clean_binary, [cv2.IMWRITE_JPEG_QUALITY, 95])
+        _, buf = cv2.imencode(".jpg", enhanced_bgr, [cv2.IMWRITE_JPEG_QUALITY, 95])
         enhanced_bytes = buf.tobytes()
 
         log.info("  Enhanced image: %dx%d → %d bytes",
-                 clean_binary.shape[1], clean_binary.shape[0], len(enhanced_bytes))
+                 enhanced_bgr.shape[1], enhanced_bgr.shape[0], len(enhanced_bytes))
 
         return send_file(
             io.BytesIO(enhanced_bytes),
@@ -1519,6 +1408,19 @@ def enhance():
     except Exception:
         log.error("Enhance error:\n%s", traceback.format_exc())
         return jsonify({"error": "Enhancement failed."}), 500
+
+
+@app.route("/", methods=["GET"])
+def index():
+    """Root status page — shown when someone visits the Space URL."""
+    return jsonify({
+        "service": "JIL Antipolo Attendance Scanner Backend",
+        "status":  "running",
+        "version": "2.0",
+        "ocr_engine": "tesseract" if OCR_AVAILABLE else ("easyocr" if EASYOCR_AVAILABLE else "none"),
+        "gemini_configured": bool(GEMINI_API_KEY),
+        "endpoints": ["/scan", "/enhance", "/export", "/health", "/debug"],
+    })
 
 
 @app.route("/health", methods=["GET"])

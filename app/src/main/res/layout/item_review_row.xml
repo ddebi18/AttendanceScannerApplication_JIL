@@ -34,12 +34,12 @@
         android:paddingBottom="6dp"
         android:minHeight="48dp">
 
-        <!-- Last Name (editable) — weight 2.5 -->
+        <!-- Last Name (editable) — weight 2.2 -->
         <TextView
             android:id="@+id/tvLastName"
             android:layout_width="0dp"
             android:layout_height="match_parent"
-            android:layout_weight="2.5"
+            android:layout_weight="2.2"
             android:gravity="center_vertical"
             android:paddingStart="4dp"
             android:paddingEnd="2dp"
@@ -50,12 +50,12 @@
             android:ellipsize="end"
             android:background="?attr/selectableItemBackground" />
 
-        <!-- First Name (editable) — weight 3 -->
+        <!-- First Name (editable) — weight 2.5 -->
         <TextView
             android:id="@+id/tvFirstName"
             android:layout_width="0dp"
             android:layout_height="match_parent"
-            android:layout_weight="3"
+            android:layout_weight="2.5"
             android:gravity="center_vertical"
             android:paddingStart="2dp"
             android:paddingEnd="2dp"
@@ -66,12 +66,12 @@
             android:ellipsize="end"
             android:background="?attr/selectableItemBackground" />
 
-        <!-- Network (editable) — weight 1.8 -->
+        <!-- Network (editable) — weight 1.0 -->
         <TextView
             android:id="@+id/tvNetwork"
             android:layout_width="0dp"
             android:layout_height="match_parent"
-            android:layout_weight="1.8"
+            android:layout_weight="1.0"
             android:gravity="center_vertical"
             android:paddingStart="2dp"
             android:paddingEnd="2dp"
@@ -101,13 +101,13 @@
         <!-- Delete button -->
         <ImageButton
             android:id="@+id/btnDeleteRow"
-            android:layout_width="30dp"
-            android:layout_height="30dp"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
             android:src="@android:drawable/ic_menu_delete"
             android:tint="#FFE57373"
             android:background="?attr/selectableItemBackgroundBorderless"
             android:contentDescription="Delete row"
-            android:padding="4dp" />
+            android:padding="8dp" />
 
     </LinearLayout>
 

@@ -38,10 +38,17 @@ public class ReviewAdapter extends RecyclerView.Adapter<ReviewAdapter.RowViewHol
         void onDataChanged();
     }
 
+    /** Fired when the user edits a name or network — for propagating to all tabs. */
+    public interface OnRowEditedListener {
+        void onRowEditedGlobally(String id, String newLastName, String newFirstName, String newNetwork);
+        void onRowAddedGlobally(String id, String lastName, String firstName, String network);
+    }
+
     private final Context              context;
     private final List<AttendanceRow>  rows;
     private final OnDataChangedListener listener;
     private final int                  selectedColumn;  // 0-9: which attendance col to show
+    private OnRowEditedListener        rowEditedListener;
 
     // IDs of the 10 attendance ImageButtons in item_review_row
     private static final int[] ATT_IDS = {
@@ -56,7 +63,11 @@ public class ReviewAdapter extends RecyclerView.Adapter<ReviewAdapter.RowViewHol
         this.context        = context;
         this.rows           = rows;
         this.listener       = listener;
-        this.selectedColumn = Math.max(0, Math.min(9, selectedColumn));
+        this.selectedColumn = Math.max(-1, Math.min(9, selectedColumn));
+    }
+
+    public void setOnRowEditedListener(OnRowEditedListener l) {
+        this.rowEditedListener = l;
     }
 
     @NonNull
@@ -166,7 +177,8 @@ public class ReviewAdapter extends RecyclerView.Adapter<ReviewAdapter.RowViewHol
                     .setTitle("Edit " + title)
                     .setView(et)
                     .setPositiveButton("Save", (d, w) -> {
-                        String val = et.getText().toString().trim().toUpperCase();
+                        String val = et.getText().toString().trim().toUpperCase()
+                                        .replace("ñ", "n").replace("Ñ", "N");
                         if (field == 0) { row.lastName  = val; }
                         else if (field == 1) { row.firstName = val; }
                         else { row.network = val; }
@@ -185,6 +197,10 @@ public class ReviewAdapter extends RecyclerView.Adapter<ReviewAdapter.RowViewHol
                         }
                         notifyItemChanged(position);
                         listener.onDataChanged();
+                        // Notify global listener so other tabs can sync
+                        if (rowEditedListener != null) {
+                            rowEditedListener.onRowEditedGlobally(row.id, row.lastName, row.firstName, row.network);
+                        }
                     })
                     .setNegativeButton("Cancel", null)
                     .show();
@@ -193,6 +209,10 @@ public class ReviewAdapter extends RecyclerView.Adapter<ReviewAdapter.RowViewHol
 
     @Override
     public int getItemCount() { return rows.size(); }
+
+    public List<AttendanceRow> getRows() {
+        return rows;
+    }
 
     // ── ViewHolder ────────────────────────────────────────────────────────────
 

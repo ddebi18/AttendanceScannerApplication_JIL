@@ -12,6 +12,8 @@ import java.util.Arrays;
 public class AttendanceRow implements Serializable {
 
     // ── Identity ───────────────────────────────────────────────────────────────
+    public String id;
+    public String db_id;
     public String lastName;
     public String firstName;
     public String network;
@@ -34,6 +36,7 @@ public class AttendanceRow implements Serializable {
 
     /** Default constructor for manually added rows. */
     public AttendanceRow() {
+        id            = java.util.UUID.randomUUID().toString();
         lastName      = "";
         firstName     = "";
         network       = "";
@@ -51,14 +54,17 @@ public class AttendanceRow implements Serializable {
      * Constructor from parsed JSON fields.
      */
     public AttendanceRow(
+            String id,
             String lastName, int lastNameConf,
             String firstName, int firstNameConf,
             String network, int networkConf,
             boolean[] attendance,
             boolean flagged) {
-        this.lastName       = lastName;
+        this.id             = id != null ? id : java.util.UUID.randomUUID().toString();
+        this.db_id          = null; // Assigned separately if matched
+        this.lastName       = lastName != null ? lastName.replace("ñ", "n").replace("Ñ", "N") : "";
         this.lastNameConf   = lastNameConf;
-        this.firstName      = firstName;
+        this.firstName      = firstName != null ? firstName.replace("ñ", "n").replace("Ñ", "N") : "";
         this.firstNameConf  = firstNameConf;
         this.network        = network;
         this.networkConf    = networkConf;
@@ -86,5 +92,11 @@ public class AttendanceRow implements Serializable {
         int n = 0;
         for (boolean b : attendance) if (b) n++;
         return n;
+    }
+
+    /** Normalize a name string: strip enye characters (ñ→n, Ñ→N). */
+    public static String normalize(String s) {
+        if (s == null) return "";
+        return s.replace("ñ", "n").replace("Ñ", "N");
     }
 }

@@ -33,6 +33,16 @@
                 android:textStyle="bold" />
         </LinearLayout>
 
+        <!-- Search Bar -->
+        <androidx.appcompat.widget.SearchView
+            android:id="@+id/searchView"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="@color/card_dark"
+            app:queryHint="Search names..."
+            app:iconifiedByDefault="false"
+            android:layout_marginBottom="2dp" />
+
         <!-- Column Headers -->
         <LinearLayout
             android:layout_width="match_parent"
@@ -47,7 +57,7 @@
             <TextView
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:layout_weight="1.2"
+                android:layout_weight="2.2"
                 android:text="LAST NAME"
                 android:textColor="@color/text_secondary"
                 android:textSize="10sp"
@@ -55,7 +65,7 @@
             <TextView
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:layout_weight="1.2"
+                android:layout_weight="2.5"
                 android:text="FIRST NAME"
                 android:textColor="@color/text_secondary"
                 android:textSize="10sp"
@@ -63,7 +73,7 @@
             <TextView
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:layout_weight="0.8"
+                android:layout_weight="1.0"
                 android:text="NET"
                 android:textColor="@color/text_secondary"
                 android:textSize="10sp"
@@ -80,20 +90,46 @@
                 android:textStyle="bold"
                 android:gravity="center" />
             <View
-                android:layout_width="32dp"
+                android:layout_width="40dp"
                 android:layout_height="0dp" />
         </LinearLayout>
         
         <View android:layout_width="match_parent" android:layout_height="1dp" android:background="#FF2A2A3D" />
 
-        <!-- RecyclerView for rows -->
-        <androidx.recyclerview.widget.RecyclerView
-            android:id="@+id/reviewRecyclerView"
+        <FrameLayout
             android:layout_width="match_parent"
             android:layout_height="0dp"
-            android:layout_weight="1"
-            android:clipToPadding="false"
-            android:paddingBottom="80dp" />
+            android:layout_weight="1">
+            <!-- RecyclerView for rows -->
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/reviewRecyclerView"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:clipToPadding="false"
+                android:paddingBottom="80dp"
+                android:paddingEnd="30dp" />
+
+            <com.example.attendacejil.AlphabetIndexScroller
+                android:id="@+id/alphabetScroller"
+                android:layout_width="36dp"
+                android:layout_height="match_parent"
+                android:layout_gravity="end"
+                android:layout_marginEnd="2dp"
+                android:layout_marginTop="8dp"
+                android:layout_marginBottom="8dp" />
+
+            <com.google.android.material.floatingactionbutton.FloatingActionButton
+                android:id="@+id/fabAddMember"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="bottom|end"
+                android:layout_marginEnd="48dp"
+                android:layout_marginBottom="24dp"
+                android:src="@android:drawable/ic_input_add"
+                app:tint="@android:color/white"
+                app:backgroundTint="@color/accent_blue"
+                android:contentDescription="Add Member" />
+        </FrameLayout>
 
     </LinearLayout>
 
@@ -143,15 +179,10 @@
             android:layout_height="0dp"
             android:layout_weight="1" />
 
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btnAddRow"
-            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="+ Add Member"
-            android:textColor="@color/accent_blue"
-            app:strokeColor="@color/accent_blue"
-            app:cornerRadius="20dp" />
+        <Space
+            android:layout_width="0dp"
+            android:layout_height="40dp"
+            android:layout_weight="1" />
     </LinearLayout>
 
 </FrameLayout>

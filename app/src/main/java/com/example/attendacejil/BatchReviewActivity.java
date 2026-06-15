@@ -45,6 +45,8 @@ public class BatchReviewActivity extends AppCompatActivity {
 
     private String jsonFilePath;
     private int selectedYear, selectedMonth;
+    private android.widget.ImageButton btnViewImage;
+    private boolean[] disabledWeeks;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -56,11 +58,13 @@ public class BatchReviewActivity extends AppCompatActivity {
             jsonFilePath = savedInstanceState.getString("json_file_path");
             selectedYear = savedInstanceState.getInt("year", java.util.Calendar.getInstance().get(java.util.Calendar.YEAR));
             selectedMonth = savedInstanceState.getInt("month", java.util.Calendar.getInstance().get(java.util.Calendar.MONTH));
+            disabledWeeks = savedInstanceState.getBooleanArray("disabled_weeks");
         } else {
             jsonFilePath = getIntent().getStringExtra("json_file_path");
             java.util.Calendar now = java.util.Calendar.getInstance();
             selectedYear = getIntent().getIntExtra(ReviewActivity.EXTRA_YEAR, now.get(java.util.Calendar.YEAR));
             selectedMonth = getIntent().getIntExtra(ReviewActivity.EXTRA_MONTH, now.get(java.util.Calendar.MONTH));
+            disabledWeeks = getIntent().getBooleanArrayExtra("disabled_weeks");
         }
         
         if (jsonFilePath == null || jsonFilePath.isEmpty() || !new File(jsonFilePath).exists()) {
@@ -80,17 +84,19 @@ public class BatchReviewActivity extends AppCompatActivity {
         outState.putString("json_file_path", jsonFilePath);
         outState.putInt("year", selectedYear);
         outState.putInt("month", selectedMonth);
+        outState.putBooleanArray("disabled_weeks", disabledWeeks);
     }
 
     private void bindViews() {
         tabLayout = findViewById(R.id.tabLayout);
         viewPager = findViewById(R.id.viewPager);
         btnExportAll = findViewById(R.id.btnExportAll);
+        btnViewImage = findViewById(R.id.btnViewImage);
         findViewById(R.id.btnBack).setOnClickListener(v -> confirmExit());
     }
 
     private void setupViewPager() {
-        adapter = new BatchReviewPagerAdapter(this, jsonFilePath);
+        adapter = new BatchReviewPagerAdapter(this, jsonFilePath, disabledWeeks);
         viewPager.setAdapter(adapter);
 
         // Keep all 10 tabs in memory so we don't lose state
@@ -105,13 +111,80 @@ public class BatchReviewActivity extends AppCompatActivity {
         };
 
         new TabLayoutMediator(tabLayout, viewPager,
-                (tab, position) -> tab.setText(tabLabels[position])
+                (tab, position) -> {
+                    int colIdx = adapter.getColumnIndex(position);
+                    tab.setText(tabLabels[colIdx]);
+                }
         ).attach();
     }
 
     private void setupButtons() {
         btnExportAll.setText("Export All (Up to 10 CSVs)");
         btnExportAll.setOnClickListener(v -> checkAndExportAll());
+
+        if (btnViewImage != null) {
+            btnViewImage.setOnClickListener(v -> {
+                ArrayList<String> uris = getIntent().getStringArrayListExtra(ImageViewerActivity.EXTRA_IMAGE_URIS);
+                ArrayList<String> labels = getIntent().getStringArrayListExtra(ImageViewerActivity.EXTRA_IMAGE_LABELS);
+                if (uris == null || uris.isEmpty()) {
+                    Toast.makeText(this, "No original images found.", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                if (uris.size() == 1) {
+                    Intent intent = new Intent(BatchReviewActivity.this, ImageViewerActivity.class);
+                    intent.putStringArrayListExtra(ImageViewerActivity.EXTRA_IMAGE_URIS, uris);
+                    startActivity(intent);
+                } else {
+                    android.widget.BaseAdapter listAdapter = new android.widget.BaseAdapter() {
+                        @Override public int getCount() { return uris.size(); }
+                        @Override public Object getItem(int position) { return uris.get(position); }
+                        @Override public long getItemId(int position) { return position; }
+                        @Override public android.view.View getView(int position, android.view.View convertView, android.view.ViewGroup parent) {
+                            if (convertView == null) {
+                                convertView = getLayoutInflater().inflate(R.layout.item_image_picker, parent, false);
+                            }
+                            android.widget.TextView tvTitle = convertView.findViewById(R.id.tvImageTitle);
+                            android.widget.TextView tvSub = convertView.findViewById(R.id.tvImageSubtitle);
+                            tvTitle.setText("Image " + (position + 1));
+                            String label = (labels != null && position < labels.size()) ? labels.get(position) : "Page " + (position + 1);
+                            tvSub.setText("Names: " + label);
+                            return convertView;
+                        }
+                    };
+
+                    new MaterialAlertDialogBuilder(this, R.style.AttendanceDialogTheme)
+                            .setTitle("Select Image to View")
+                            .setAdapter(listAdapter, (d, which) -> {
+                                Intent intent = new Intent(BatchReviewActivity.this, ImageViewerActivity.class);
+                                intent.putStringArrayListExtra(ImageViewerActivity.EXTRA_IMAGE_URIS, uris);
+                                intent.putExtra(ImageViewerActivity.EXTRA_INITIAL_INDEX, which);
+                                startActivity(intent);
+                            })
+                            .setNegativeButton("Cancel", null)
+                            .show();
+                }
+            });
+        }
+    }
+
+    /** Called by a ReviewFragment's adapter when the user edits a row — propagates to all other tabs. */
+    public void onRowEditedGlobally(String id, String newLastName, String newFirstName, String newNetwork) {
+        for (int i = 0; i < 10; i++) {
+            ReviewFragment frag = adapter.getFragment(i);
+            if (frag != null) {
+                frag.updateRowGlobally(id, newLastName, newFirstName, newNetwork);
+            }
+        }
+    }
+
+    public void onRowAddedGlobally(String id, String lastName, String firstName, String network) {
+        for (int i = 0; i < 10; i++) {
+            ReviewFragment frag = adapter.getFragment(i);
+            if (frag != null) {
+                // Fragment will skip if it already added it
+                frag.addRowGlobally(id, lastName, firstName, network);
+            }
+        }
     }
 
     private void confirmExit() {
@@ -126,8 +199,9 @@ public class BatchReviewActivity extends AppCompatActivity {
     private void checkAndExportAll() {
         // Check if all active tabs are ready for export (no flagged rows, no invalid rows)
         int blockingTab = -1;
-        for (int i = 0; i < 10; i++) {
-            ReviewFragment frag = adapter.getFragment(i);
+        for (int i = 0; i < adapter.getItemCount(); i++) {
+            int colIdx = adapter.getColumnIndex(i);
+            ReviewFragment frag = adapter.getFragment(colIdx);
             if (frag != null && !frag.canExport()) {
                 blockingTab = i;
                 break;
@@ -145,28 +219,52 @@ public class BatchReviewActivity extends AppCompatActivity {
             return;
         }
 
-        // Build payloads and export sequentially
-        exportSequential(0, new ArrayList<>());
+        // Sync to database first, then export sequentially
+        ReviewFragment firstFrag = null;
+        for (int i = 0; i < adapter.getItemCount(); i++) {
+            firstFrag = adapter.getFragment(adapter.getColumnIndex(i));
+            if (firstFrag != null) break;
+        }
+
+        if (firstFrag != null) {
+            btnExportAll.setEnabled(false);
+            btnExportAll.setText("Syncing Database...");
+            DbSyncHelper.syncRowsToDb(this, selectedYear, selectedMonth, firstFrag.getRows(), new DbSyncHelper.SyncCallback() {
+                @Override
+                public void onSuccess() {
+                    exportSequential(0, new ArrayList<>());
+                }
+
+                @Override
+                public void onFailure(String error) {
+                    btnExportAll.setEnabled(true);
+                    btnExportAll.setText("Export All (Up to 10 CSVs)");
+                    Toast.makeText(BatchReviewActivity.this, "DB Sync Failed: " + error, Toast.LENGTH_LONG).show();
+                }
+            });
+        } else {
+            exportSequential(0, new ArrayList<>());
+        }
     }
 
-    private void exportSequential(int index, List<File> exportedFiles) {
-        if (index >= 10) {
+    private void exportSequential(int position, List<File> exportedFiles) {
+        if (position >= adapter.getItemCount()) {
             showExportSuccess(exportedFiles);
             return;
         }
 
-        ReviewFragment frag = adapter.getFragment(index);
+        int colIdx = adapter.getColumnIndex(position);
+        ReviewFragment frag = adapter.getFragment(colIdx);
         if (frag == null) {
-            exportSequential(index + 1, exportedFiles);
+            exportSequential(position + 1, exportedFiles);
             return;
         }
 
         List<AttendanceRow> rowsToExport = frag.getRows();
         
         // Find which column this tab corresponds to
-        int sunday = (index / 2) + 1;
-        int service = (index % 2) + 1;
-        int colIdx = index; // 0 to 9
+        int sunday = (colIdx / 2) + 1;
+        int service = (colIdx % 2) + 1;
 
         // Count how many people ACTUALLY attended this session
         long attendeesThisSession = rowsToExport.stream()
@@ -175,12 +273,12 @@ public class BatchReviewActivity extends AppCompatActivity {
 
         if (attendeesThisSession == 0) {
             // Nothing to export for this tab (e.g. 5th Sunday didn't happen)
-            exportSequential(index + 1, exportedFiles);
+            exportSequential(position + 1, exportedFiles);
             return;
         }
 
         btnExportAll.setEnabled(false);
-        btnExportAll.setText("Exporting " + (index + 1) + "/10…");
+        btnExportAll.setText("Exporting " + (position + 1) + "/" + adapter.getItemCount() + "…");
 
         try {
             JSONObject payload = new JSONObject();
@@ -222,18 +320,18 @@ public class BatchReviewActivity extends AppCompatActivity {
                                 File f = saveCsvLocal(resp.body(), sunday, service);
                                 if (f != null) exportedFiles.add(f);
                             }
-                            exportSequential(index + 1, exportedFiles);
+                            exportSequential(position + 1, exportedFiles);
                         }
 
                         @Override
                         public void onFailure(@NonNull Call<ResponseBody> call, @NonNull Throwable t) {
                             Toast.makeText(BatchReviewActivity.this, "Export failed on WK" + sunday + " SVC" + service, Toast.LENGTH_SHORT).show();
-                            exportSequential(index + 1, exportedFiles);
+                            exportSequential(position + 1, exportedFiles);
                         }
                     });
 
         } catch (Exception e) {
-            exportSequential(index + 1, exportedFiles);
+            exportSequential(position + 1, exportedFiles);
         }
     }
 

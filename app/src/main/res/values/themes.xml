@@ -62,9 +62,9 @@
 
     <!-- Attendance checkmark toggle button in the review table -->
     <style name="AttCheckBtn">
-        <item name="android:layout_width">28dp</item>
-        <item name="android:layout_height">28dp</item>
-        <item name="android:padding">2dp</item>
+        <item name="android:layout_width">48dp</item>
+        <item name="android:layout_height">48dp</item>
+        <item name="android:padding">10dp</item>
         <item name="android:background">?attr/selectableItemBackgroundBorderless</item>
         <item name="android:contentDescription">Toggle attendance</item>
     </style>

@@ -53,6 +53,15 @@
                 android:textColor="@color/text_secondary"
                 android:textSize="12sp" />
         </LinearLayout>
+
+        <ImageButton
+            android:id="@+id/btnViewImage"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:src="@android:drawable/ic_menu_gallery"
+            android:tint="@color/accent_blue"
+            android:contentDescription="View Source Images" />
     </LinearLayout>
 
     <View android:layout_width="match_parent" android:layout_height="1dp"

@@ -71,12 +71,16 @@ public class ReviewActivity extends AppCompatActivity
     private RecyclerView   recyclerView;
     private ReviewAdapter  adapter;
     private Button         btnExportCsv, btnRescan, btnPurgeDeleted;
+    private com.google.android.material.floatingactionbutton.FloatingActionButton fabAddMember;
+    private android.widget.ImageButton btnViewImage;
     private LinearLayout   bannerFlagged;
     private TextView       tvBannerText;
     private View           emptyStateLayout;
 
     // ── Data ──────────────────────────────────────────────────────────────────
+    private final List<AttendanceRow> allRows = new ArrayList<>();
     private final List<AttendanceRow> rows = new ArrayList<>();
+    private String currentQuery = "";
     private int sundayNum, serviceNum;
     private int selectedYear, selectedMonth;
 
@@ -113,6 +117,8 @@ public class ReviewActivity extends AppCompatActivity
             org.json.JSONArray arr = new org.json.JSONArray();
             for (AttendanceRow r : rows) {
                 org.json.JSONObject obj = new org.json.JSONObject();
+                obj.put("id", r.id);
+                obj.put("db_id", r.db_id);
                 obj.put("last_name", r.lastName);
                 obj.put("last_name_conf", r.lastNameConf);
                 obj.put("first_name", r.firstName);
@@ -151,10 +157,12 @@ public class ReviewActivity extends AppCompatActivity
             for (int i = 0; i < arr.length(); i++) {
                 org.json.JSONObject obj = arr.getJSONObject(i);
                 
+                String id         = obj.optString("id", java.util.UUID.randomUUID().toString());
                 String lastName   = obj.optString("last_name",  "");
                 int    lastConf   = obj.optInt   ("last_name_conf",  0);
                 String firstName  = obj.optString("first_name", "");
                 int    firstConf  = obj.optInt   ("first_name_conf", 0);
+                String db_id      = obj.optString("db_id", null);
                 String network    = obj.optString("network",    "");
                 int    netConf    = obj.optInt   ("network_conf",    0);
                 boolean flagged   = obj.optBoolean("flagged",   false);
@@ -168,14 +176,17 @@ public class ReviewActivity extends AppCompatActivity
                 }
                 
                 AttendanceRow row = new AttendanceRow(
+                        id,
                         lastName, lastConf,
                         firstName, firstConf,
                         network, netConf,
                         att, flagged);
+                row.db_id = db_id;
                 row.manuallyAdded = obj.optBoolean("manually_added", false);
                 row.markedForDeletion = obj.optBoolean("marked_for_deletion", false);
-                rows.add(row);
+                allRows.add(row);
             }
+            filterRows("");
         } catch (Exception e) {
             android.widget.Toast.makeText(this, "Could not restore state: " + e.getMessage(),
                     android.widget.Toast.LENGTH_LONG).show();
@@ -189,9 +200,48 @@ public class ReviewActivity extends AppCompatActivity
         btnExportCsv     = findViewById(R.id.btnExportCsv);
         btnRescan        = findViewById(R.id.btnRescan);
         btnPurgeDeleted  = findViewById(R.id.btnPurgeDeleted);
+        fabAddMember     = findViewById(R.id.fabAddMember);
+        btnViewImage     = findViewById(R.id.btnViewImage);
         bannerFlagged    = findViewById(R.id.bannerFlagged);
         tvBannerText     = findViewById(R.id.tvBannerText);
         emptyStateLayout = findViewById(R.id.emptyStateLayout);
+
+        // Scroller setup moved to setupRecyclerView()
+
+        androidx.appcompat.widget.SearchView searchView = findViewById(R.id.searchView);
+        if (searchView != null) {
+            searchView.setOnQueryTextListener(new androidx.appcompat.widget.SearchView.OnQueryTextListener() {
+                @Override
+                public boolean onQueryTextSubmit(String query) {
+                    filterRows(query);
+                    return true;
+                }
+                @Override
+                public boolean onQueryTextChange(String newText) {
+                    filterRows(newText);
+                    return true;
+                }
+            });
+        }
+    }
+
+    private void filterRows(String query) {
+        currentQuery = query == null ? "" : query.trim().toLowerCase(java.util.Locale.getDefault());
+        rows.clear();
+        for (AttendanceRow r : allRows) {
+            if (currentQuery.isEmpty() ||
+                r.lastName.toLowerCase(java.util.Locale.getDefault()).contains(currentQuery) ||
+                r.firstName.toLowerCase(java.util.Locale.getDefault()).contains(currentQuery)) {
+                rows.add(r);
+            }
+        }
+        java.util.Collections.sort(rows, (r1, r2) -> {
+            int cmp = r1.lastName.compareToIgnoreCase(r2.lastName);
+            if (cmp == 0) return r1.firstName.compareToIgnoreCase(r2.firstName);
+            return cmp;
+        });
+        if (adapter != null) adapter.notifyDataSetChanged();
+        updateEmptyState();
     }
 
     // ── Parse intent extras ───────────────────────────────────────────────────
@@ -227,28 +277,31 @@ public class ReviewActivity extends AppCompatActivity
             for (int i = 0; i < arr.length(); i++) {
                 JSONObject obj = arr.getJSONObject(i);
 
+                String id         = obj.optString("id", java.util.UUID.randomUUID().toString());
                 String lastName   = obj.optString("last_name",  "");
                 int    lastConf   = obj.optInt   ("last_name_conf",  0);
                 String firstName  = obj.optString("first_name", "");
                 int    firstConf  = obj.optInt   ("first_name_conf", 0);
+                String db_id      = obj.optString("db_id", null);
                 String network    = obj.optString("network",    "");
                 int    netConf    = obj.optInt   ("network_conf",    0);
                 boolean flagged   = obj.optBoolean("flagged",   false);
 
                 boolean[] att = new boolean[10];
-                JSONArray attArr = obj.optJSONArray("attendance");
-                if (attArr != null) {
-                    for (int j = 0; j < Math.min(attArr.length(), 10); j++) {
-                        att[j] = attArr.optBoolean(j, false);
-                    }
-                }
+                // Ignored backend attendance to force manual check:
+                // JSONArray attArr = obj.optJSONArray("attendance");
+                // if (attArr != null) { ... }
 
-                rows.add(new AttendanceRow(
+                AttendanceRow row = new AttendanceRow(
+                        id,
                         lastName, lastConf,
                         firstName, firstConf,
                         network, netConf,
-                        att, flagged));
+                        att, flagged);
+                row.db_id = db_id;
+                allRows.add(row);
             }
+            filterRows("");
         } catch (Exception e) {
             Toast.makeText(this, "Could not parse scan data: " + e.getMessage(),
                     Toast.LENGTH_LONG).show();
@@ -268,6 +321,11 @@ public class ReviewActivity extends AppCompatActivity
 
         // Show empty state immediately if no rows were scanned
         updateEmptyState();
+
+        AlphabetIndexScroller scroller = findViewById(R.id.alphabetScroller);
+        if (scroller != null) {
+            scroller.setRecyclerView(recyclerView, adapter);
+        }
     }
 
     /** Show/hide the empty-state panel based on active (non-deleted) row count. */
@@ -281,23 +339,177 @@ public class ReviewActivity extends AppCompatActivity
     private void setupButtons() {
         btnRescan.setOnClickListener(v -> confirmRescan());
 
+        if (btnViewImage != null) {
+            btnViewImage.setOnClickListener(v -> {
+                java.util.ArrayList<String> uris = getIntent().getStringArrayListExtra(ImageViewerActivity.EXTRA_IMAGE_URIS);
+                java.util.ArrayList<String> labels = getIntent().getStringArrayListExtra(ImageViewerActivity.EXTRA_IMAGE_LABELS);
+                if (uris == null || uris.isEmpty()) {
+                    android.widget.Toast.makeText(this, "No original image found.", android.widget.Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                if (uris.size() == 1) {
+                    Intent intent = new Intent(ReviewActivity.this, ImageViewerActivity.class);
+                    intent.putStringArrayListExtra(ImageViewerActivity.EXTRA_IMAGE_URIS, uris);
+                    startActivity(intent);
+                } else {
+                    android.widget.BaseAdapter listAdapter = new android.widget.BaseAdapter() {
+                        @Override public int getCount() { return uris.size(); }
+                        @Override public Object getItem(int position) { return uris.get(position); }
+                        @Override public long getItemId(int position) { return position; }
+                        @Override public android.view.View getView(int position, android.view.View convertView, android.view.ViewGroup parent) {
+                            if (convertView == null) {
+                                convertView = getLayoutInflater().inflate(R.layout.item_image_picker, parent, false);
+                            }
+                            android.widget.TextView tvTitle = convertView.findViewById(R.id.tvImageTitle);
+                            android.widget.TextView tvSub = convertView.findViewById(R.id.tvImageSubtitle);
+                            tvTitle.setText("Image " + (position + 1));
+                            String label = (labels != null && position < labels.size()) ? labels.get(position) : "Page " + (position + 1);
+                            tvSub.setText("Names: " + label);
+                            return convertView;
+                        }
+                    };
+
+                    new com.google.android.material.dialog.MaterialAlertDialogBuilder(this, R.style.AttendanceDialogTheme)
+                            .setTitle("Select Image to View")
+                            .setAdapter(listAdapter, (d, which) -> {
+                                Intent intent = new Intent(ReviewActivity.this, ImageViewerActivity.class);
+                                intent.putStringArrayListExtra(ImageViewerActivity.EXTRA_IMAGE_URIS, uris);
+                                intent.putExtra(ImageViewerActivity.EXTRA_INITIAL_INDEX, which);
+                                startActivity(intent);
+                            })
+                            .setNegativeButton("Cancel", null)
+                            .show();
+                }
+            });
+        }
+
         btnExportCsv.setOnClickListener(v -> exportCsv());
 
-        findViewById(R.id.btnAddRow).setOnClickListener(v -> {
-            rows.add(new AttendanceRow());   // blank, manuallyAdded=true
-            adapter.notifyItemInserted(rows.size() - 1);
-            recyclerView.scrollToPosition(rows.size() - 1);
-            updateEmptyState();
-            refreshBannerAndExport();
-        });
+        if (fabAddMember != null) {
+            fabAddMember.setOnClickListener(v -> showAddMemberDialog());
+        }
 
         btnPurgeDeleted.setOnClickListener(v -> {
-            rows.removeIf(r -> r.markedForDeletion);
-            adapter.notifyDataSetChanged();
+            allRows.removeIf(r -> r.markedForDeletion);
+            filterRows(currentQuery);
             btnPurgeDeleted.setVisibility(View.GONE);
             updateEmptyState();
             refreshBannerAndExport();
         });
+    }
+
+    private void showAddMemberDialog() {
+        android.app.Dialog dialog = new android.app.Dialog(this);
+        dialog.requestWindowFeature(android.view.Window.FEATURE_NO_TITLE);
+        dialog.setContentView(R.layout.dialog_add_member);
+        if (dialog.getWindow() != null) {
+            dialog.getWindow().setLayout(android.view.ViewGroup.LayoutParams.MATCH_PARENT, android.view.ViewGroup.LayoutParams.WRAP_CONTENT);
+            dialog.getWindow().setBackgroundDrawableResource(android.R.color.transparent);
+        }
+
+        com.google.android.material.textfield.TextInputEditText etFirst = dialog.findViewById(R.id.etFirstName);
+        com.google.android.material.textfield.TextInputEditText etLast = dialog.findViewById(R.id.etLastName);
+        com.google.android.material.textfield.TextInputEditText etNet = dialog.findViewById(R.id.etNetwork);
+        
+        dialog.findViewById(R.id.btnCancel).setOnClickListener(view -> dialog.dismiss());
+        dialog.findViewById(R.id.btnAdd).setOnClickListener(view -> {
+            String first = AttendanceRow.normalize(etFirst.getText() != null ? etFirst.getText().toString().trim() : "");
+            String last  = AttendanceRow.normalize(etLast.getText()  != null ? etLast.getText().toString().trim()  : "");
+            String net   = etNet.getText() != null ? etNet.getText().toString().trim() : "";
+            if (first.isEmpty() || last.isEmpty() || net.isEmpty()) {
+                android.widget.Toast.makeText(this, "Please fill in all fields", android.widget.Toast.LENGTH_SHORT).show();
+                return;
+            }
+
+            // Check for duplicates in the current review list
+            AttendanceRow dup = findDuplicateRow(first, last);
+            if (dup != null) {
+                String dupName = dup.lastName + ", " + dup.firstName;
+                new MaterialAlertDialogBuilder(this, R.style.AttendanceDialogTheme)
+                        .setTitle("⚠️ Possible Duplicate")
+                        .setMessage("\"" + last + ", " + first + "\" looks similar to an existing entry:\n\n• " + dupName
+                                + "\n\nDo you want to add anyway, or view the existing entry?")
+                        .setPositiveButton("Add Anyway", (d, w) -> {
+                            dialog.dismiss();
+                            commitAddMember(last, first, net);
+                        })
+                        .setNegativeButton("Show Duplicate", (d, w) -> {
+                            dialog.dismiss();
+                            scrollToRow(dup);
+                        })
+                        .setNeutralButton("Cancel", null)
+                        .show();
+                return;
+            }
+
+            dialog.dismiss();
+            commitAddMember(last, first, net);
+        });
+        dialog.show();
+    }
+
+    /** Fuzzy search for a row that matches the given first+last name (Levenshtein distance ≤ 2). */
+    private AttendanceRow findDuplicateRow(String first, String last) {
+        String ln = last.toLowerCase(java.util.Locale.getDefault());
+        String fn = first.toLowerCase(java.util.Locale.getDefault());
+        for (AttendanceRow r : allRows) {
+            if (r.markedForDeletion) continue;
+            int dist = NameMatcher.levenshtein(ln, r.lastName.toLowerCase(java.util.Locale.getDefault()))
+                     + NameMatcher.levenshtein(fn, r.firstName.toLowerCase(java.util.Locale.getDefault()));
+            if (dist <= 2) return r;
+        }
+        return null;
+    }
+
+    /** Actually add the new member row and scroll to it. */
+    private void commitAddMember(String last, String first, String net) {
+        String newId = java.util.UUID.randomUUID().toString();
+        AttendanceRow newRow = new AttendanceRow(newId, last, 100, first, 100, net, 100, new boolean[10], false);
+        newRow.manuallyAdded = true;
+        allRows.add(newRow);
+        filterRows(currentQuery);
+        int pos = rows.indexOf(newRow);
+        if (pos >= 0) scrollToRow(newRow);
+        updateEmptyState();
+        refreshBannerAndExport();
+    }
+
+    /** Scroll to and highlight the given row in the RecyclerView. */
+    private void scrollToRow(AttendanceRow target) {
+        // Clear any active query filter so the row is visible
+        androidx.appcompat.widget.SearchView sv = findViewById(R.id.searchView);
+        if (sv != null && !sv.getQuery().toString().isEmpty()) {
+            sv.setQuery("", true);
+        }
+        int pos = rows.indexOf(target);
+        if (pos < 0) {
+            // Might be filtered out — show in full list
+            filterRows("");
+            pos = rows.indexOf(target);
+        }
+        if (pos < 0) return;
+        final int finalPos = pos;
+        recyclerView.smoothScrollToPosition(finalPos);
+        recyclerView.postDelayed(() -> {
+            androidx.recyclerview.widget.RecyclerView.ViewHolder vh =
+                    recyclerView.findViewHolderForAdapterPosition(finalPos);
+            if (vh != null) {
+                android.view.View card = vh.itemView;
+                android.animation.ArgbEvaluator evaluator = new android.animation.ArgbEvaluator();
+                android.animation.ValueAnimator anim = android.animation.ValueAnimator
+                        .ofObject(evaluator, 0xFFFF6F00, 0xFF1E1E2E); // amber flash -> background
+                anim.setDuration(1200);
+                anim.setRepeatMode(android.animation.ValueAnimator.REVERSE);
+                anim.setRepeatCount(1);
+                anim.addUpdateListener(a -> card.setBackgroundColor((int) a.getAnimatedValue()));
+                anim.addListener(new android.animation.AnimatorListenerAdapter() {
+                    @Override public void onAnimationEnd(android.animation.Animator animation) {
+                        card.setBackground(null); // restore card default
+                    }
+                });
+                anim.start();
+            }
+        }, 400);
     }
 
     // ── OnDataChangedListener ─────────────────────────────────────────────────
@@ -362,6 +574,27 @@ public class ReviewActivity extends AppCompatActivity
     // ── Export CSV ────────────────────────────────────────────────────────────
 
     private void exportCsv() {
+        btnExportCsv.setEnabled(false);
+        btnExportCsv.setText("Syncing Database...");
+
+        DbSyncHelper.syncRowsToDb(this, selectedYear, selectedMonth, rows, new DbSyncHelper.SyncCallback() {
+            @Override
+            public void onSuccess() {
+                runOnUiThread(() -> proceedWithCsvExport());
+            }
+
+            @Override
+            public void onFailure(String error) {
+                runOnUiThread(() -> {
+                    btnExportCsv.setEnabled(true);
+                    btnExportCsv.setText("Export CSV");
+                    Toast.makeText(ReviewActivity.this, "DB Sync Failed: " + error, Toast.LENGTH_LONG).show();
+                });
+            }
+        });
+    }
+
+    private void proceedWithCsvExport() {
         // Build JSON payload
         try {
             JSONObject payload = new JSONObject();
@@ -393,7 +626,6 @@ public class ReviewActivity extends AppCompatActivity
                     MediaType.parse("application/json"),
                     payload.toString());
 
-            btnExportCsv.setEnabled(false);
             btnExportCsv.setText("Exporting…");
 
             RetrofitClient.getApiService()

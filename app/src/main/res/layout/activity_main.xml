@@ -20,7 +20,7 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:fillViewport="true"
-        android:paddingBottom="100dp"
+        android:paddingBottom="170dp"
         android:clipToPadding="false">
 
         <LinearLayout
@@ -151,7 +151,8 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:orientation="horizontal"
-                        android:weightSum="5">
+                        android:weightSum="5"
+                        android:paddingEnd="4dp">
 
                         <Button android:id="@+id/btn1stSunday" style="@style/SundayButton"
                             android:layout_weight="1" android:text="1ST" />
@@ -351,28 +352,21 @@
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="2.  Tap 📷 to open the scanner"
+                        android:text="2.  Tap 🖼 to pick an image from gallery"
                         android:textColor="@color/text_primary"
                         android:textSize="13sp"
                         android:layout_marginBottom="4dp" />
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="3.  Align the sheet — tap SCAN"
+                        android:text="3.  Review &amp; edit the detected data"
                         android:textColor="@color/text_primary"
                         android:textSize="13sp"
                         android:layout_marginBottom="4dp" />
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="4.  Review &amp; edit the detected data"
-                        android:textColor="@color/text_primary"
-                        android:textSize="13sp"
-                        android:layout_marginBottom="4dp" />
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="5.  Export as CSV"
+                        android:text="4.  Export as CSV"
                         android:textColor="@color/accent_green"
                         android:textSize="13sp" />
                 </LinearLayout>
@@ -414,7 +408,7 @@
                         android:textColor="@color/accent_blue"
                         app:strokeColor="@color/accent_blue"
                         app:cornerRadius="12dp" />
-                        
+
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
@@ -423,62 +417,131 @@
                         android:textSize="12sp"
                         android:layout_gravity="center_horizontal"
                         android:layout_marginTop="6dp" />
+
                 </LinearLayout>
             </androidx.cardview.widget.CardView>
+
 
         </LinearLayout>
     </androidx.core.widget.NestedScrollView>
 
-    <!-- ══ FAB STACK (bottom-right) ════════════════════════════════════════════ -->
+
+    <!-- ══ BOTTOM ACTION BUTTONS (centered) ═══════════════════════════════════ -->
     <LinearLayout
-        android:layout_width="wrap_content"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_gravity="bottom|end"
-        android:layout_margin="20dp"
-        android:orientation="vertical"
-        android:gravity="center_horizontal">
+        android:layout_gravity="bottom|center_horizontal"
+        android:background="@color/card_dark"
+        android:orientation="horizontal"
+        android:gravity="center"
+        android:paddingStart="24dp"
+        android:paddingEnd="24dp"
+        android:paddingTop="12dp"
+        android:paddingBottom="16dp"
+        android:elevation="12dp"
+        android:weightSum="3"
+        android:baselineAligned="false">
 
-        <!-- Gallery FAB (mini) -->
-        <com.google.android.material.floatingactionbutton.FloatingActionButton
-            android:id="@+id/fabGallery"
-            android:layout_width="wrap_content"
+        <!-- Gallery button -->
+        <LinearLayout
+            android:id="@+id/fabGalleryContainer"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="12dp"
-            android:contentDescription="Choose from Gallery"
-            android:src="@android:drawable/ic_menu_gallery"
-            app:backgroundTint="@color/card_dark"
-            app:tint="@color/accent_blue"
-            app:fabSize="mini"
-            app:elevation="6dp"
-            app:strokeColor="@color/accent_blue"
-            app:strokeWidth="1dp" />
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:gravity="center"
+            android:padding="12dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:layout_marginEnd="8dp">
 
-        <!-- Enhance FAB (mini) — CamScanner-style enhancement + download -->
-        <com.google.android.material.floatingactionbutton.FloatingActionButton
-            android:id="@+id/fabEnhance"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="12dp"
-            android:contentDescription="Enhance document image"
-            android:src="@android:drawable/ic_menu_edit"
-            app:backgroundTint="@color/card_dark"
-            app:tint="#FFFF9800"
-            app:fabSize="mini"
-            app:elevation="6dp"
-            app:strokeColor="#FFFF9800"
-            app:strokeWidth="1dp" />
+            <com.google.android.material.floatingactionbutton.FloatingActionButton
+                android:id="@+id/fabGallery"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:contentDescription="Choose from Gallery"
+                android:src="@android:drawable/ic_menu_gallery"
+                app:backgroundTint="@color/accent_blue"
+                app:tint="@android:color/white"
+                app:fabSize="normal"
+                app:elevation="6dp" />
 
-        <!-- Camera FAB (blue) — opens CameraActivity → /scan → ReviewActivity -->
-        <com.google.android.material.floatingactionbutton.FloatingActionButton
-            android:id="@+id/fabCamera"
-            android:layout_width="wrap_content"
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="Scan from Gallery"
+                android:textColor="@color/text_primary"
+                android:textSize="12sp"
+                android:textStyle="bold"
+                android:gravity="center" />
+        </LinearLayout>
+
+        <!-- Enhance / multi-image button -->
+        <LinearLayout
+            android:id="@+id/fabEnhanceContainer"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:contentDescription="Scan attendance sheet"
-            android:src="@android:drawable/ic_menu_camera"
-            app:backgroundTint="@color/accent_blue"
-            app:tint="@android:color/white"
-            app:elevation="8dp"
-            android:enabled="false" />
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:gravity="center"
+            android:padding="12dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:layout_marginStart="8dp">
+
+            <com.google.android.material.floatingactionbutton.FloatingActionButton
+                android:id="@+id/fabEnhance"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:contentDescription="Enhance source image"
+                android:src="@android:drawable/ic_menu_slideshow"
+                app:backgroundTint="#FFFF9800"
+                app:tint="@android:color/white"
+                app:fabSize="normal"
+                app:elevation="6dp" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="Enhance Source Image"
+                android:textColor="@color/text_primary"
+                android:textSize="12sp"
+                android:textStyle="bold"
+                android:gravity="center" />
+        </LinearLayout>
+        <!-- Manage Members button -->
+        <LinearLayout
+            android:id="@+id/fabManageMembersContainer"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:gravity="center"
+            android:padding="8dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:layout_marginStart="4dp">
+
+            <com.google.android.material.floatingactionbutton.FloatingActionButton
+                android:id="@+id/fabManageMembers"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:contentDescription="Manage Members"
+                android:src="@android:drawable/ic_menu_myplaces"
+                app:backgroundTint="#4CAF50"
+                app:tint="@android:color/white"
+                app:fabSize="normal"
+                app:elevation="6dp" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="Manage\nMembers"
+                android:textColor="@color/text_primary"
+                android:textSize="12sp"
+                android:textStyle="bold"
+                android:gravity="center" />
+        </LinearLayout>
 
     </LinearLayout>
 

@@ -3,14 +3,14 @@
     xmlns:tools="http://schemas.android.com/tools">
 
     <!-- Permissions -->
-    <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
         android:maxSdkVersion="28" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
         android:maxSdkVersion="32" />
 
-    <uses-feature android:name="android.hardware.camera" android:required="true" />
+    <!-- Camera is not required — app works gallery-only -->
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
 
     <application
         android:allowBackup="true"
@@ -28,7 +28,7 @@
             android:name=".MainActivity"
             android:exported="true"
             android:configChanges="orientation|screenSize|screenLayout"
-            android:screenOrientation="fullSensor">
+            android:screenOrientation="portrait">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
@@ -40,35 +40,49 @@
             android:name=".CameraActivity"
             android:exported="false"
             android:configChanges="orientation|screenSize|screenLayout"
-            android:screenOrientation="fullSensor" />
+            android:screenOrientation="portrait" />
 
         <!-- ReviewActivity — fullSensor for landscape table scrolling -->
         <activity
             android:name=".ReviewActivity"
             android:exported="false"
             android:configChanges="orientation|screenSize|screenLayout"
-            android:screenOrientation="fullSensor" />
+            android:screenOrientation="portrait" />
 
         <!-- PreviewActivity (retained for future use) -->
         <activity
             android:name=".PreviewActivity"
             android:exported="false"
             android:configChanges="orientation|screenSize|screenLayout"
-            android:screenOrientation="fullSensor" />
+            android:screenOrientation="portrait" />
 
         <!-- BatchMonthlyActivity — fullSensor -->
         <activity
             android:name=".BatchMonthlyActivity"
             android:exported="false"
             android:configChanges="orientation|screenSize|screenLayout"
-            android:screenOrientation="fullSensor" />
+            android:screenOrientation="portrait" />
 
         <!-- BatchReviewActivity — fullSensor for landscape table scrolling -->
         <activity
             android:name=".BatchReviewActivity"
             android:exported="false"
             android:configChanges="orientation|screenSize|screenLayout"
-            android:screenOrientation="fullSensor" />
+            android:screenOrientation="portrait" />
+
+        <!-- ImageViewerActivity — fullSensor -->
+        <activity
+            android:name=".ImageViewerActivity"
+            android:exported="false"
+            android:configChanges="orientation|screenSize|screenLayout"
+            android:screenOrientation="portrait" />
+
+        <!-- ManageMembersActivity — fullSensor -->
+        <activity
+            android:name=".ManageMembersActivity"
+            android:exported="false"
+            android:configChanges="orientation|screenSize|screenLayout"
+            android:screenOrientation="portrait" />
 
         <!-- FileProvider for sharing exported CSV via Intent.ACTION_SEND -->
         <provider
@@ -81,6 +95,12 @@
                 android:resource="@xml/file_provider_paths" />
         </provider>
 
+        <activity
+            android:name=".BulkAddReviewActivity"
+            android:exported="false"
+            android:screenOrientation="portrait"
+            android:theme="@style/Theme.AttendaceJIL" />
+            
     </application>
 
 </manifest>
