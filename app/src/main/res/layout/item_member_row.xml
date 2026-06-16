@@ -37,16 +37,6 @@
                 android:layout_marginTop="4dp"
                 android:textColor="@color/text_secondary"
                 android:textSize="14sp" />
-
-            <TextView
-                android:id="@+id/tvDuplicateWarning"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="4dp"
-                android:text="⚠ Duplicate First Name"
-                android:textColor="#FFFF9800"
-                android:textSize="12sp"
-                android:visibility="gone" />
         </LinearLayout>
 
         <ImageButton

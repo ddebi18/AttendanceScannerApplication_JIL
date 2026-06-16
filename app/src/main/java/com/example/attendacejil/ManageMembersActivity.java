@@ -44,17 +44,11 @@ public class ManageMembersActivity extends AppCompatActivity {
     private ActivityResultLauncher<PickVisualMediaRequest> launcherGallery;
     private android.widget.ProgressBar progressBar;
     private androidx.appcompat.widget.SearchView searchView;
-    private android.content.SharedPreferences prefs;
-    private java.util.Set<String> dismissedWarningIds;
-    private final java.util.Set<String> memberIdsWithWarnings = new java.util.HashSet<>();
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_manage_members);
-        
-        prefs = getSharedPreferences("ManageMembersPrefs", android.content.Context.MODE_PRIVATE);
-        dismissedWarningIds = new java.util.HashSet<>(prefs.getStringSet("dismissed_warnings", new java.util.HashSet<>()));
 
         rvMembers = findViewById(R.id.rvMembers);
         progressBar = findViewById(R.id.progressBar);
@@ -245,26 +239,6 @@ public class ManageMembersActivity extends AppCompatActivity {
                             allMembersList.add(arr.getJSONObject(i));
                         }
                         
-                        memberIdsWithWarnings.clear();
-                        for (int i = 0; i < allMembersList.size(); i++) {
-                            JSONObject m1 = allMembersList.get(i);
-                            String id1 = m1.optString("id");
-                            String fn1 = m1.optString("first_name", "").toLowerCase().trim();
-                            if (fn1.isEmpty()) continue;
-                            
-                            for (int j = i + 1; j < allMembersList.size(); j++) {
-                                JSONObject m2 = allMembersList.get(j);
-                                String id2 = m2.optString("id");
-                                String fn2 = m2.optString("first_name", "").toLowerCase().trim();
-                                if (fn2.isEmpty()) continue;
-                                
-                                int dist = NameMatcher.levenshtein(fn1, fn2);
-                                if (dist == 0 || dist == 1 || (dist == 2 && fn1.length() >= 5 && fn2.length() >= 5)) {
-                                    if (!dismissedWarningIds.contains(id1)) memberIdsWithWarnings.add(id1);
-                                    if (!dismissedWarningIds.contains(id2)) memberIdsWithWarnings.add(id2);
-                                }
-                            }
-                        }
                         // Sort alphabetically
                         allMembersList.sort((a, b) -> {
                             String nameA = a.optString("last_name", "") + a.optString("first_name", "");
@@ -588,28 +562,6 @@ public class ManageMembersActivity extends AppCompatActivity {
             } else {
                 holder.tvMemberNetwork.setText("No Network");
             }
-
-            String id = member.optString("id");
-            if (memberIdsWithWarnings.contains(id)) {
-                holder.tvDuplicateWarning.setVisibility(View.VISIBLE);
-                holder.tvDuplicateWarning.setText("⚠ Similar First Name (Tap to dismiss)");
-                holder.tvDuplicateWarning.setOnClickListener(v -> {
-                    new com.google.android.material.dialog.MaterialAlertDialogBuilder(ManageMembersActivity.this)
-                            .setTitle("Dismiss Warning")
-                            .setMessage("Hide the similar name warning for " + member.optString("first_name") + "?")
-                            .setPositiveButton("Dismiss", (dialog, which) -> {
-                                dismissedWarningIds.add(id);
-                                prefs.edit().putStringSet("dismissed_warnings", dismissedWarningIds).apply();
-                                memberIdsWithWarnings.remove(id);
-                                notifyItemChanged(position);
-                            })
-                            .setNegativeButton("Cancel", null)
-                            .show();
-                });
-            } else {
-                holder.tvDuplicateWarning.setVisibility(View.GONE);
-                holder.tvDuplicateWarning.setOnClickListener(null);
-            }
             
             holder.itemView.setOnClickListener(v -> {
                 showEditMemberDialog(member);
@@ -635,14 +587,13 @@ public class ManageMembersActivity extends AppCompatActivity {
         }
 
         class MemberViewHolder extends RecyclerView.ViewHolder {
-            TextView tvMemberName, tvMemberNetwork, tvDuplicateWarning;
+            TextView tvMemberName, tvMemberNetwork;
             android.widget.ImageButton btnEdit, btnDelete;
 
             MemberViewHolder(@NonNull View itemView) {
                 super(itemView);
                 tvMemberName = itemView.findViewById(R.id.tvMemberName);
                 tvMemberNetwork = itemView.findViewById(R.id.tvMemberNetwork);
-                tvDuplicateWarning = itemView.findViewById(R.id.tvDuplicateWarning);
                 btnEdit = itemView.findViewById(R.id.btnEdit);
                 btnDelete = itemView.findViewById(R.id.btnDelete);
             }
