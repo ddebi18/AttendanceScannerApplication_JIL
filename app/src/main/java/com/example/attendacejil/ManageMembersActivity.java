@@ -273,7 +273,6 @@ public class ManageMembersActivity extends AppCompatActivity {
         }
 
         android.widget.NumberPicker pickerMonth = dialog.findViewById(R.id.pickerMonth);
-        android.widget.NumberPicker pickerYear = dialog.findViewById(R.id.pickerYear);
 
         String[] months = {"January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"};
         pickerMonth.setMinValue(0);
@@ -284,18 +283,13 @@ public class ManageMembersActivity extends AppCompatActivity {
         int currentYear = cal.get(java.util.Calendar.YEAR);
         int currentMonth = cal.get(java.util.Calendar.MONTH);
 
-        pickerYear.setMinValue(currentYear - 5);
-        pickerYear.setMaxValue(currentYear + 5);
-        
         pickerMonth.setValue(currentMonth);
-        pickerYear.setValue(currentYear);
 
         dialog.findViewById(R.id.btnCancelPicker).setOnClickListener(v -> dialog.dismiss());
         dialog.findViewById(R.id.btnConfirmPicker).setOnClickListener(v -> {
             int selectedMonth = pickerMonth.getValue();
-            int selectedYear = pickerYear.getValue();
             dialog.dismiss();
-            exportPdfForMonth(selectedYear, selectedMonth);
+            exportPdfForMonth(currentYear, selectedMonth);
         });
 
         dialog.show();
@@ -319,9 +313,8 @@ public class ManageMembersActivity extends AppCompatActivity {
         java.util.Calendar cal = java.util.Calendar.getInstance();
         cal.set(java.util.Calendar.YEAR, prevYear);
         cal.set(java.util.Calendar.MONTH, prevMonth);
-        String prevMonthName = new java.text.SimpleDateFormat("MMMM", java.util.Locale.getDefault()).format(cal.getTime()).toUpperCase(java.util.Locale.getDefault());
 
-        SupabaseClient.getApiService().getAttendance("eq." + prevYear, "eq." + prevMonthName).enqueue(new Callback<String>() {
+        SupabaseClient.getApiService().getAttendance("eq." + prevYear, "eq." + prevMonth).enqueue(new Callback<String>() {
             @Override
             public void onResponse(@NonNull Call<String> call, @NonNull Response<String> response) {
                 if (response.isSuccessful() && response.body() != null) {
